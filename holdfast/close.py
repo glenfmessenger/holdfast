@@ -138,7 +138,11 @@ def render_pr_body(record: dict, title: str, fid: str, commits: list[dict] | Non
     where = f"scratch commit {scratch} (the patch applied at {rev}); branch commit {fix['sha'][:10]}"
     def cite(detail: str) -> str:
         # tier-1 text says "PASS on fix <scratch>"; make the scratch/branch distinction explicit
-        return detail.replace(f"on fix {scratch}", f"on {where}").replace(scratch, f"scratch commit {scratch}") if scratch else detail
+        if not scratch:
+            return detail
+        if f"on fix {scratch}" in detail:
+            return detail.replace(f"on fix {scratch}", f"on {where}")
+        return detail.replace(scratch, f"scratch commit {scratch}")
     ev = "\n".join(f"  - tier {e['tier']} {e['kind']}: {cite(e['detail'])}" for e in record["evidence_by_tier"])
     examined = k.get("covered") or []
     ex_lines = "\n".join(f"- `{c.get('function')}` in `{c.get('file')}` — {c.get('reason', '')}" for c in examined) or "- (none listed)"
