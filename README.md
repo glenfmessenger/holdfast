@@ -2,13 +2,11 @@
 
 ## What it does
 
-Holdfast turns a security fix into a **remediation contract**: a durable record of the security property the fix
-establishes, with evidence, scoped to the files and functions the property depends on. It then walks forward
-through every later commit that touches that scope and re-verifies the property, producing a **verdict** per fix
-per commit: HELD, REGRESSED, INCOMPLETE_AT_MERGE, MOVED or UNVERIFIABLE. Evidence is tiered and never blended:
-an executed regression test (tier 1), presence of the guard lines the fix introduced (tier 2), a resurrection rule
-(tier 3), or a model judgement over the contract and the diff (tier 4). The prototype was run on 20 Django CVE
-fixes from 2019–2023 and one OpenSSH fix from 2006 whose 2020 regression became CVE-2024-6387 (regreSSHion).
+Holdfast turns a security fix into a **remediation contract**: a durable record of the property the fix establishes,
+with tiered evidence and a scope of files and functions. It walks every later commit touching that scope and re-verifies
+the property, emitting a verdict per fix per commit: HELD, REGRESSED, INCOMPLETE_AT_MERGE, MOVED or UNVERIFIABLE.
+Evidence tiers are never blended: executed test (1), guard-line presence (2), resurrection rule (3), model judgement (4).
+Run on 20 Django CVE fixes (2019–2023) and the OpenSSH 2006 fix whose 2020 regression became CVE-2024-6387.
 
 ## How to run it
 
@@ -29,10 +27,7 @@ export ANTHROPIC_API_KEY=sk-ant-...        # tier 4. Without it: tier 4 is recor
 ./scripts/create_all.sh && ./scripts/walk_all.sh       # everything in contracts/targets.json
 ```
 
-`--model` overrides the default `claude-sonnet-5`. Tier-4 calls are capped at 150 per run and every call is logged
-to `results/model_calls.jsonl`; past the cap, verdicts needing tier 4 are UNVERIFIABLE with reason "budget".
-Walks are pinned to `--range`, only visit commits touching the contract's scope (following renames), run only
-the fix's own test ids, and evaluate at most 40 commits per contract (even sampling, recorded in each verdict).
+`--model` overrides `claude-sonnet-5`. Tier 4 is capped at 150 calls per run, each logged to `results/model_calls.jsonl`; past the cap, verdicts needing it are UNVERIFIABLE ("budget"). Walks stay inside `--range`, visit only scope-touching commits (renames followed), run only the fix's own test ids, and sample evenly above 40 commits.
 
 ## What's real vs stubbed
 
@@ -55,37 +50,35 @@ the fix's own test ids, and evaluate at most 40 commits per contract (even sampl
 
 ## Results
 
-Run: 21 contracts, 392 verdicts, 150 tier-4 calls (the cap; 8 verdicts ended UNVERIFIABLE "budget").
-Verdicts: 356 HELD, 23 REGRESSED, 1 MOVED, 12 UNVERIFIABLE. Deciding tier: 134 tier 1, 127 tier 2, 8 tier 3,
-123 tier 4. **HELD (model-only): 108 of 356.** Full tables: `results/report.md`, `results/eval.md`.
+21 contracts, 392 verdicts, 150 tier-4 calls (cap hit; 8 UNVERIFIABLE "budget"). 356 HELD, 23 REGRESSED, 1 MOVED,
+12 UNVERIFIABLE; deciding tier 134 / 127 / 8 / 123. **HELD model-only: 108 of 356.** Tables: `results/report.md`, `results/eval.md`.
 
-Eval on 25 pre-registered pairs (24 walked): REGRESSED precision 1/1 and recall 1/1, Wilson 95% [0.21, 1.00];
-exact-status agreement 20/24 = 0.83 [0.64, 0.93]; 9/24 pair verdicts were model-only. n is tiny and the
-interval says so. Over the whole population, 1 of 23 REGRESSED verdicts is a true regression.
+Eval, 25 pre-registered pairs (24 walked): REGRESSED precision 1/1, recall 1/1, Wilson 95% [0.21, 1.00];
+exact-status agreement 20/24 = 0.83 [0.64, 0.93]; 9/24 model-only. n is tiny and the interval says so.
+Across all verdicts, 1 of 23 REGRESSED is real.
 
-1. **Held through a real refactor** — CVE-2021-28658 at the cgi-module removal, tier 1: `results/verdicts/CVE-2021-28658/34e2148fc7.json`
-2. **Regression caught** — OpenSSH regreSSHion commit, tier 4, rename named in the rationale: `results/verdicts/CVE-2006-5051/752250caab.json`
-3. **False resurrection rejected** — CVE-2021-33571 with every guard line rewritten, tier 4: `results/verdicts/CVE-2021-33571/bdf3e156b4.json`
-4. **The miss** — CVE-2022-34265, see below: `results/verdicts/CVE-2022-34265/877c800f25.json`
+1. **Held through a real refactor**, tier 1: `results/verdicts/CVE-2021-28658/34e2148fc7.json`
+2. **Regression caught**, OpenSSH, tier 4, rename named in the rationale: `results/verdicts/CVE-2006-5051/752250caab.json`
+3. **False resurrection rejected**, every guard line rewritten, tier 4: `results/verdicts/CVE-2021-33571/bdf3e156b4.json`
+4. **The miss**: `results/verdicts/CVE-2022-34265/877c800f25.json`
 
 ## Where it breaks
 
-**The miss.** `877c800f25` replaced the CVE-2022-34265 whitelist with parameterized SQL in each backend. The model
-saw only the scope-file diff (whitelist deleted) and said REGRESSED with high confidence, nine commits running.
-The property survived by a different mechanism in different files. That is the problem in one sentence: a
-security property is continuous across the codebase's evolution in a way that neither guard lines nor a
-scope-restricted diff can follow.
+**The miss.** `877c800f25` replaced the CVE-2022-34265 whitelist with parameterized SQL in each backend. The model saw
+only the scope-file diff (whitelist deleted) and said REGRESSED, high confidence, nine commits running. The property
+survived by a different mechanism in different files. That is the "not possible yet": a security property is
+continuous across a codebase's evolution in ways neither guard lines nor a scope-restricted diff can follow.
 
-Every other wrong verdict, by name:
-- CVE-2019-12308, 8 × REGRESSED at tier 3 from `caf80cb41f`: the deleted line `def __init__(self, attrs=None):` reappeared in a new, unrelated widget class. The rule matches text, not identity.
-- CVE-2019-14232, 2 × REGRESSED at tier 1 (`6ee37ada32`, `3cadeea077`): Truncator was rewritten on HTMLParser and the regexes deleted; the extracted test fails on ellipsis placement, not on the DoS property. The test encodes 2019 output, not the invariant. Same contract: 4 × UNVERIFIABLE because the guard is two module-level constants with no function to show the model.
-- CVE-2020-24583, 3 × REGRESSED at tier 1 from `0b33a3abc2`: the frozen 2020 staticfiles test asserts a file mode Django later changed on purpose; Django's own test passes at that commit. Guard intact.
-- CVE-2021-45452 at `fe4a0bbe20` (labelled HELD): never visited. `storage/base.py` was born by copy in the storage split, not by rename, so it never entered the scope.
-- Sibling check: 3 of 4 pre-registered INCOMPLETE_AT_MERGE cases missed, including the one-hop-caller miss on CVE-2021-28658 (UploadedFile is a sibling consumer of the same untrusted name, not a caller). The one hit (CVE-2019-14232) flagged `re_tag`, not the regexes the 2023 CVE was actually about: right label, wrong reason.
-- HELD vs MOVED: three storage/response relocations were called HELD at tier 1 because the test still passed. No alarm, but the contract never learned where its code went.
+Every other wrong verdict:
+- CVE-2019-12308, 8 × REGRESSED (tier 3): the deleted line `def __init__(self, attrs=None):` reappeared in an unrelated new class.
+- CVE-2019-14232, 2 × REGRESSED (tier 1): Truncator rewritten on HTMLParser; the test fails on ellipsis placement, not the DoS property. Plus 4 × UNVERIFIABLE: module-level constants, no function to show.
+- CVE-2020-24583, 3 × REGRESSED (tier 1): frozen 2020 test asserts a file mode Django later changed; Django's own test passes there.
+- CVE-2021-45452 at `fe4a0bbe20`: never visited; `storage/base.py` was born by copy, not rename.
+- Sibling check: 3 of 4 pre-registered INCOMPLETE_AT_MERGE cases missed (sibling consumers are not callers). The one hit flagged the wrong regex.
+- Three relocations called HELD at tier 1 rather than MOVED: no alarm, but the contract never learned where its code went.
 
 ## What I'd build next
 
-1. **Re-anchor contracts on HELD.** After a tier-1 or confirmed tier-4 HELD where guard lines changed, re-derive guard lines and scope from the new code. Today one rewrite blinds tier 2 forever and pushes every later commit to the model.
-2. **Scope by data flow, not call graph.** Track the untrusted value (file name, lookup_name) to every consumer, including mechanism moves into other files. This would have covered the miss and the sibling-consumer gap.
-3. **Distinguish property tests from behaviour tests.** Extract only assertions that exercise the advisory's input class; a test on ellipsis placement should never produce REGRESSED.
+1. **Re-anchor contracts on HELD**: re-derive guard lines and scope after a confirmed HELD with changed lines. Today one rewrite blinds tier 2 forever.
+2. **Scope by data flow, not call graph**: follow the untrusted value to every consumer and mechanism move. Covers the miss and the sibling gap.
+3. **Separate property tests from behaviour tests**: extract only assertions exercising the advisory's input class.
