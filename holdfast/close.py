@@ -111,36 +111,7 @@ def close(report: Path, fid: str, repo_path: Path | None, model: ModelClient, re
     finally:
         _run(["git", "-C", str(repo_path), "worktree", "remove", "--force", str(wt)], check=False)
 
-    k = record["completeness"]
-    derived = record.get("derived_findings") or []
-    ev = "\n".join(f"- tier {e['tier']} {e['kind']}: {e['detail']}" for e in record["evidence_by_tier"])
-    body = f"""**Closed by Holdfast** (`holdfast close`). Base `{base_branch}` is the report's stamped revision {short}. {prov}
-
-## Property
-
-{record['property']}
-
-## Evidence by tier, per commit
-
-- **Fix commit** `{commits[0][1][:10]}` — {parent['title']} (evidence gathered on the patch applied at {short}):
-{ev}
-- **Kept test:** {('commit `' + commits[1][1][:10] + '`, paths ' + ', '.join(kept_test['paths'])) if kept_test['paths'] else 'null — ' + kept_test['reason']}
-- **Record commit** `{commits[-1][1][:10]}` — `.holdfast/records/{fid}.json`
-
-## Cannot verify
-
-{record['cannot_verify']}
-
-## Completeness
-
-Verdict: **{k['verdict']}**. Protected value: {k.get('protected_value')}.
-
-Derived findings: {(', '.join(derived)) if derived else 'none — query returned COMPLETE; see cannot-verify'}.
-Derived findings go back through Suggest patches; no sibling patches are in this PR.
-
----
-Nothing in this PR was applied without the user choosing close.
-"""
+    body = render_pr_body(record, parent["title"], fid)
     body_path = report / "records" / f"{fid}.pr-body.md"
     body_path.write_text(body)
     url = _run(["gh", "pr", "create", "--repo", gh_repo, "--base", base_branch, "--head", branch,
@@ -149,6 +120,54 @@ Nothing in this PR was applied without the user choosing close.
     (report / "records" / f"{fid}.json").write_text(json.dumps(record, indent=2) + "\n")
     return {"finding": fid, "verdict": k["verdict"], "derived": derived, "commits": record["close"]["commits"],
             "kept_test": kept_test, "pr_url": url}
+
+
+def render_pr_body(record: dict, title: str, fid: str) -> str:
+    """PR body from the record. The user-facing completeness text never says COMPLETE: it lists what was
+    examined and then what cannot be verified. The internal verdict enum stays in the record JSON."""
+    cl = record["close"]
+    k = record["completeness"]
+    kept = record["kept_test"]
+    derived = record.get("derived_findings") or []
+    commits = cl["commits"]
+    fix = next(c for c in commits if c["role"] == "fix")
+    rec = next(c for c in commits if c["role"] == "record")
+    kept_c = next((c for c in commits if c["role"] == "kept test"), None)
+    ev = "\n".join(f"  - tier {e['tier']} {e['kind']}: {e['detail']}" for e in record["evidence_by_tier"])
+    examined = k.get("covered") or []
+    ex_lines = "\n".join(f"- `{c.get('function')}` in `{c.get('file')}` — {c.get('reason', '')}" for c in examined) or "- (none listed)"
+    kept_line = (f"commit `{kept_c['sha'][:10]}`, paths {', '.join(kept['paths'])}" if kept.get("paths") and kept_c
+                 else f"null — {kept.get('reason')}")
+    if derived:
+        derived_text = ", ".join(derived) + ". Derived findings go back through Suggest patches; no sibling patches are in this PR."
+    else:
+        derived_text = "none. Derived findings, when listed, go back through Suggest patches; no sibling patches are in this PR."
+    return f"""**Closed by Holdfast** (`holdfast close`). Base `{cl['base_branch']}` is the report's stamped revision {cl['base_commit'][:10]}. {cl['provenance']}
+
+## Property
+
+{record['property']}
+
+## Evidence by tier, per commit
+
+- **Fix commit** `{fix['sha'][:10]}` — {title} (evidence gathered on the patch applied at {cl['base_commit'][:10]}):
+{ev}
+- **Kept test:** {kept_line}
+- **Record commit** `{rec['sha'][:10]}` — `.holdfast/records/{fid}.json`
+
+## Completeness
+
+No uncovered consumers found among the {len(examined)} examined (protected value: {k.get('protected_value')}; {len(k.get('files_in_context', []))} files in context):
+
+{ex_lines}
+
+Cannot verify: {record['cannot_verify']}
+
+Derived findings: {derived_text}
+
+---
+Nothing in this PR was applied without the user choosing close.
+"""
 
 
 def close_command(args) -> int:

@@ -3,10 +3,10 @@
   "report": "/Users/glen/projects/holdfast/.targets/django-b/CLAUDE-SECURITY-20260904-052717",
   "patch": "/Users/glen/projects/holdfast/.targets/django-b/CLAUDE-SECURITY-20260904-052717/patches/F1.patch",
   "patch_base_commit": "78fea27f690028204c03c28d821cb0c0240a7398",
-  "scratch_commit": "12db09f3cc2d7466fd2ba385a7a05edefac232bb",
+  "scratch_commit": "b432a3e793e279a69dcef03566f1bfbaee83adfd",
   "scratch_note": "patch applied at the stamped revision in a scratch worktree; this commit is on no branch and is not pushed",
-  "property": "In MultiPartParser.parse(), any Content-Disposition filename must pass through sanitize_file_name(), which unescapes HTML entities first, strips Windows-style backslash paths second, and applies os.path.basename() last, so no encoded or literal path-separator sequence can survive into the value used to construct filesystem paths.",
-  "vulnerability": "MultiPartParser.parse() applied os.path.basename() to the raw Content-Disposition filename before HTML-unescaping it, so an attacker could HTML-entity-encode path separators (e.g. '..&#x2F;') to slip '../' sequences past the basename check; after unescaping, the resulting filename contained real path traversal sequences that could be passed to upload handlers writing to the filesystem.",
+  "property": "In MultiPartParser.parse(), the uploaded file name passed to the upload handler is produced solely by MultiPartParser.sanitize_file_name(), which must perform html.unescape() first, then strip Windows-style backslash paths, and apply os.path.basename() last, so no path-separator characters (real or entity-encoded) can remain in the returned name.",
+  "vulnerability": "MultiPartParser.parse() ran os.path.basename() on the raw Content-Disposition filename before HTML-unescaping it, so an attacker could HTML-entity-encode path separators (e.g. '..&#x2F;') to survive the basename() check and only become real '../' sequences after unescaping, letting a custom upload handler write files outside the intended upload directory.",
   "scope": {
     "files": [
       "django/http/multipartparser.py"
@@ -73,17 +73,20 @@
       "kind": "property_derivation",
       "detail": "model-stated property and sibling judgement (verbatim reply in data)",
       "data": {
-        "model_reply_verbatim": "```json\n{\n  \"vulnerability\": \"MultiPartParser.parse() applied os.path.basename() to the raw Content-Disposition filename before HTML-unescaping it, so an attacker could HTML-entity-encode path separators (e.g. '..&#x2F;') to slip '../' sequences past the basename check; after unescaping, the resulting filename contained real path traversal sequences that could be passed to upload handlers writing to the filesystem.\",\n  \"property\": \"In MultiPartParser.parse(), any Content-Disposition filename must pass through sanitize_file_name(), which unescapes HTML entities first, strips Windows-style backslash paths second, and applies os.path.basename() last, so no encoded or literal path-separator sequence can survive into the value used to construct filesystem paths.\",\n  \"guard_summary\": \"The single call `file_name = self.sanitize_file_name(file_name)` routes all filenames through a helper that enforces unescape -> strip backslash-prefix -> basename ordering, with os.path.basename() as the final step.\",\n  \"sibling\": {\"covered\": true, \"note\": \"No other pre-fix occurrences of basename-before-unescape or similar filename-sanitization patterns were found in the grep hits (none reported), and the diff shows only one call site (django/http/multipartparser.py::parse) which was updated; IE_sanitize is aliased to the new function so any other internal callers of IE_sanitize also get the fixed ordering.\"},\n  \"uncertainty\": \"This contract only verifies the ordering within sanitize_file_name() and its single call site in parse(); it cannot verify that downstream upload handlers (e.g. custom new_file() implementations) don't perform additional unsafe path construction with the sanitized name, nor does it cover other Django versions/branches or non-multipart file-upload code paths outside this file.\"\n}\n```",
+        "model_reply_verbatim": "```json\n{\n  \"vulnerability\": \"MultiPartParser.parse() ran os.path.basename() on the raw Content-Disposition filename before HTML-unescaping it, so an attacker could HTML-entity-encode path separators (e.g. '..&#x2F;') to survive the basename() check and only become real '../' sequences after unescaping, letting a custom upload handler write files outside the intended upload directory.\",\n  \"property\": \"In MultiPartParser.parse(), the uploaded file name passed to the upload handler is produced solely by MultiPartParser.sanitize_file_name(), which must perform html.unescape() first, then strip Windows-style backslash paths, and apply os.path.basename() last, so no path-separator characters (real or entity-encoded) can remain in the returned name.\",\n  \"guard_summary\": \"parse() now calls self.sanitize_file_name(file_name), a single helper that unescapes HTML entities before stripping backslash prefixes and applying os.path.basename() as the final step.\",\n  \"sibling\": {\"covered\": null, \"note\": \"No sibling grep hits were reported in scope, and IE_sanitize was aliased to sanitize_file_name rather than removed, suggesting no other call sites needed separate fixing, but this cannot be confirmed from the given hits.\"},\n  \"uncertainty\": \"This contract only verifies the ordering of operations within sanitize_file_name() and its single call site in parse(); it cannot verify that no other code path in Django or downstream upload handlers independently calls os.path.basename() or unescape() on filenames in a different order, nor that all upload handlers correctly trust only the sanitized name.\"\n}\n```",
         "model": "claude-sonnet-5",
-        "guard_summary": "The single call `file_name = self.sanitize_file_name(file_name)` routes all filenames through a helper that enforces unescape -> strip backslash-prefix -> basename ordering, with os.path.basename() as the final step."
+        "guard_summary": "parse() now calls self.sanitize_file_name(file_name), a single helper that unescapes HTML entities before stripping backslash prefixes and applying os.path.basename() as the final step."
       }
     }
   ],
-  "kept_test": null,
+  "kept_test": {
+    "paths": null,
+    "reason": "patch carries no tests"
+  },
   "kept_test_reason": "no test changes found in the fix commit to extract from",
   "completeness": {
     "contract": "F1",
-    "fix_commit": "12db09f3cc2d7466fd2ba385a7a05edefac232bb",
+    "fix_commit": "b432a3e793e279a69dcef03566f1bfbaee83adfd",
     "search_symbols": [
       "sanitize_file_name",
       "unescape",
@@ -158,33 +161,52 @@
     "files_excluded_by_cap": [],
     "context_truncated": false,
     "verdict": "COMPLETE",
-    "protected_value": "the client-supplied upload filename obtained from the Content-Disposition header in MultiPartParser.parse() (disposition.get('filename'))",
+    "protected_value": "the uploaded file's name taken from the Content-Disposition header in MultiPartParser.parse()",
     "uncovered": [],
     "covered": [
       {
         "file": "django/http/multipartparser.py",
         "function": "MultiPartParser.parse",
-        "reason": "The only consumer of the raw disposition filename in this file is the call `handler.new_file(field_name, file_name, content_type, content_length, charset, content_type_extra)` at line ~234-237. The fix diff inserts `file_name = self.sanitize_file_name(file_name)` (line 216) before this call and before the `if not file_name: continue` check, so file_name passed to handlers is always fully unescaped, backslash-stripped, and basename-applied: `file_name = force_str(file_name, encoding, errors='replace')` then `file_name = self.sanitize_file_name(file_name)`."
+        "reason": "file_name = disposition.get('filename') is passed through force_str then `file_name = self.sanitize_file_name(file_name)` (line 216) before being used in handler.new_file(...) calls, replacing the old basename-before-unescape sequence with unescape->backslash-strip->basename in sanitize_file_name (lines 308-312)."
       },
       {
         "file": "django/core/files/uploadhandler.py",
         "function": "FileUploadHandler.new_file / TemporaryFileUploadHandler.new_file / MemoryFileUploadHandler.file_complete",
-        "reason": "These receive file_name only via the new_file() call from MultiPartParser.parse(), which already passes the sanitized value (`self.file_name = file_name` at line 101, then used to construct `TemporaryUploadedFile(self.file_name, ...)` at line 147 and `InMemoryUploadedFile(..., name=self.file_name, ...)` at line 203); no separate raw filename path exists here."
+        "reason": "These consume self.file_name, which is set from the already-sanitized file_name produced by MultiPartParser.parse() before new_file() is called (multipartparser.py lines 234-237); no additional path-separator-bearing raw value is introduced here."
       },
       {
         "file": "django/core/files/uploadedfile.py",
-        "function": "UploadedFile.name setter (_set_name)",
-        "reason": "Receives the already-sanitized file_name from the handler chain and additionally re-applies `os.path.basename(name)` (line 42) as defense-in-depth, so this consumer is doubly covered."
+        "function": "UploadedFile._set_name",
+        "reason": "Performs an additional os.path.basename(name) on the name property (line 42), which is redundant defense-in-depth applied after the value has already passed through sanitize_file_name; it does not bypass the fix."
       }
     ],
     "note": "",
-    "value_note": "Single string value extracted at multipartparser.py line 213 (file_name = disposition.get('filename')), then decoded and sanitized before being handed to upload handlers.",
+    "value_note": "This is the file_name extracted from disposition.get('filename') in multipartparser.py, which becomes the canonical file_name passed downstream to upload handlers.",
     "context_sufficient": true,
-    "context_note": "The excerpts show the full parse() method flow from disposition.get('filename') through sanitize_file_name() to handler.new_file(), and trace file_name through the only two upload handler implementations into UploadedFile's name setter, which is the complete set of filesystem-path-relevant consumers of this value shown in the repo. Other files referencing 'basename'/'unescape'/'file_name' (loaddata, dumpdata, makemessages, html.py, staticfiles/utils.py, management/base.py, response.py, etc.) operate on unrelated values (fixture names, prog names, URLs in linkify, static file paths, download filenames) and are not consumers of the Content-Disposition upload filename, so they are correctly out of scope for this fix."
+    "context_note": "Only one call site in the shown files sources file_name from the raw Content-Disposition header (multipartparser.py line 213-216), and it is routed through the new sanitize_file_name guard before being handed to any upload handler. Downstream consumers (uploadhandler.py, uploadedfile.py) only use the already-sanitized value or apply their own redundant basename() call, not a bypass. No other reference to IE_sanitize or raw disposition filenames appears in the provided excerpts."
   },
-  "completeness_model_reply_verbatim": "{\n  \"protected_value\": \"the client-supplied upload filename obtained from the Content-Disposition header in MultiPartParser.parse() (disposition.get('filename'))\",\n  \"value_note\": \"Single string value extracted at multipartparser.py line 213 (file_name = disposition.get('filename')), then decoded and sanitized before being handed to upload handlers.\",\n  \"uncovered\": [],\n  \"covered\": [\n    {\n      \"file\": \"django/http/multipartparser.py\",\n      \"function\": \"MultiPartParser.parse\",\n      \"reason\": \"The only consumer of the raw disposition filename in this file is the call `handler.new_file(field_name, file_name, content_type, content_length, charset, content_type_extra)` at line ~234-237. The fix diff inserts `file_name = self.sanitize_file_name(file_name)` (line 216) before this call and before the `if not file_name: continue` check, so file_name passed to handlers is always fully unescaped, backslash-stripped, and basename-applied: `file_name = force_str(file_name, encoding, errors='replace')` then `file_name = self.sanitize_file_name(file_name)`.\"\n    },\n    {\n      \"file\": \"django/core/files/uploadhandler.py\",\n      \"function\": \"FileUploadHandler.new_file / TemporaryFileUploadHandler.new_file / MemoryFileUploadHandler.file_complete\",\n      \"reason\": \"These receive file_name only via the new_file() call from MultiPartParser.parse(), which already passes the sanitized value (`self.file_name = file_name` at line 101, then used to construct `TemporaryUploadedFile(self.file_name, ...)` at line 147 and `InMemoryUploadedFile(..., name=self.file_name, ...)` at line 203); no separate raw filename path exists here.\"\n    },\n    {\n      \"file\": \"django/core/files/uploadedfile.py\",\n      \"function\": \"UploadedFile.name setter (_set_name)\",\n      \"reason\": \"Receives the already-sanitized file_name from the handler chain and additionally re-applies `os.path.basename(name)` (line 42) as defense-in-depth, so this consumer is doubly covered.\"\n    }\n  ],\n  \"context_sufficient\": true,\n  \"context_note\": \"The excerpts show the full parse() method flow from disposition.get('filename') through sanitize_file_name() to handler.new_file(), and trace file_name through the only two upload handler implementations into UploadedFile's name setter, which is the complete set of filesystem-path-relevant consumers of this value shown in the repo. Other files referencing 'basename'/'unescape'/'file_name' (loaddata, dumpdata, makemessages, html.py, staticfiles/utils.py, management/base.py, response.py, etc.) operate on unrelated values (fixture names, prog names, URLs in linkify, static file paths, download filenames) and are not consumers of the Content-Disposition upload filename, so they are correctly out of scope for this fix.\"\n}",
-  "cannot_verify": "This contract only verifies the ordering within sanitize_file_name() and its single call site in parse(); it cannot verify that downstream upload handlers (e.g. custom new_file() implementations) don't perform additional unsafe path construction with the sanitized name, nor does it cover other Django versions/branches or non-multipart file-upload code paths outside this file. Consumers outside this repository (third-party packages, deployment configuration) are not examined; the consumer list is only as complete as the symbol references the query was shown.",
+  "completeness_model_reply_verbatim": "{\n  \"protected_value\": \"the uploaded file's name taken from the Content-Disposition header in MultiPartParser.parse()\",\n  \"value_note\": \"This is the file_name extracted from disposition.get('filename') in multipartparser.py, which becomes the canonical file_name passed downstream to upload handlers.\",\n  \"uncovered\": [],\n  \"covered\": [\n    {\n      \"file\": \"django/http/multipartparser.py\",\n      \"function\": \"MultiPartParser.parse\",\n      \"reason\": \"file_name = disposition.get('filename') is passed through force_str then `file_name = self.sanitize_file_name(file_name)` (line 216) before being used in handler.new_file(...) calls, replacing the old basename-before-unescape sequence with unescape->backslash-strip->basename in sanitize_file_name (lines 308-312).\"\n    },\n    {\n      \"file\": \"django/core/files/uploadhandler.py\",\n      \"function\": \"FileUploadHandler.new_file / TemporaryFileUploadHandler.new_file / MemoryFileUploadHandler.file_complete\",\n      \"reason\": \"These consume self.file_name, which is set from the already-sanitized file_name produced by MultiPartParser.parse() before new_file() is called (multipartparser.py lines 234-237); no additional path-separator-bearing raw value is introduced here.\"\n    },\n    {\n      \"file\": \"django/core/files/uploadedfile.py\",\n      \"function\": \"UploadedFile._set_name\",\n      \"reason\": \"Performs an additional os.path.basename(name) on the name property (line 42), which is redundant defense-in-depth applied after the value has already passed through sanitize_file_name; it does not bypass the fix.\"\n    }\n  ],\n  \"context_sufficient\": true,\n  \"context_note\": \"Only one call site in the shown files sources file_name from the raw Content-Disposition header (multipartparser.py line 213-216), and it is routed through the new sanitize_file_name guard before being handed to any upload handler. Downstream consumers (uploadhandler.py, uploadedfile.py) only use the already-sanitized value or apply their own redundant basename() call, not a bypass. No other reference to IE_sanitize or raw disposition filenames appears in the provided excerpts.\"\n}",
+  "cannot_verify": "This contract only verifies the ordering of operations within sanitize_file_name() and its single call site in parse(); it cannot verify that no other code path in Django or downstream upload handlers independently calls os.path.basename() or unescape() on filenames in a different order, nor that all upload handlers correctly trust only the sanitized name. Consumers outside this repository (third-party packages, deployment configuration) are not examined; the consumer list is only as complete as the symbol references the query was shown.",
   "derived_findings": [],
-  "generated_at": "2026-09-04T05:28:10Z",
-  "provenance": "holdfast integrate (prototype); plugin artifacts above were not modified except the appends listed"
+  "generated_at": "2026-09-04T05:40:26Z",
+  "provenance": "holdfast integrate (prototype); plugin artifacts above were not modified except the appends listed",
+  "close": {
+    "branch": "holdfast/close-F1-78fea27f69",
+    "base_branch": "holdfast-base-78fea27f69",
+    "base_commit": "78fea27f690028204c03c28d821cb0c0240a7398",
+    "commits": [
+      {
+        "role": "fix",
+        "sha": "4ec38c036ba6335a237e3064fb71e154d08dc255",
+        "subject": "Directory traversal via HTML-entity-encoded upload file name in MultiPartParser"
+      },
+      {
+        "role": "record",
+        "sha": "cf657f16a511f945ee4a3727597adfef389856b6",
+        "subject": "Add Holdfast record for F1"
+      }
+    ],
+    "provenance": "Patch hand-built in the plugin's schema \u2014 see PROVENANCE.md.",
+    "pr_url": "https://github.com/glenfmessenger/django/pull/2"
+  }
 }

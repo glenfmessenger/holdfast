@@ -11,7 +11,8 @@ and what could not be verified. Derived findings go back through Suggest patches
 
 The finding behind it: fixes are rarely undone and often incomplete. Of 20 fixes studied, 5 were revisited by a later
 CVE in the same function; none silently regressed in the walked, sampled history. The v1 stance is low recall and zero
-false flags, UNVERIFIABLE over guessing, evidence never blended. Continuous re-verification of the property across
+false flags, UNVERIFIABLE over guessing, evidence never blended: in the F1 record, the cannot-verify field described
+the consumer the verdict missed. Continuous re-verification of the property across
 refactoring is the six-month direction; the walk below is the experiment that showed why.
 
 ## What the prototype found
@@ -23,9 +24,17 @@ Fixes were rarely undone and often incomplete at merge. Continuous re-verificati
 
 ## See it without running anything
 
-**Demo PR:** [https://github.com/glenfmessenger/django/pull/1](https://github.com/glenfmessenger/django/pull/1). It shows a shipped fix, patches for the two sibling consumers the fix did not reach, and the
-remediation record, with an honest note that the prototype's completeness check did not produce commits 2 and 3; they
-are adapted from the project's own later fix.
+**Two PRs on a fork, with their roles.**
+
+- **What the tool produced:** [PR #2](https://github.com/glenfmessenger/django/pull/2), opened by `holdfast close` on the F1 report (hand-built in the plugin's
+  schema; the plugin did not produce it). A fix commit, a record commit, cannot-verify stated, and no sibling patches,
+  because the query judged `uploadedfile.py` covered. Kept test: null in the demo because the hand-built patch carries no
+  tests; in the real flow it comes from the patch's own test changes when the fix includes them, as Django's actual
+  CVE-2021-28658 commit did.
+- **Target output:** [PR #1](https://github.com/glenfmessenger/django/pull/1), what the corrected query would produce: the same fix, then patches for the two
+  sibling consumers, commits 2–3 hand-adapted from Django's later CVE-2021-31542 fix, and the record.
+
+The distance between the two PRs is the "not possible yet" section, rendered.
 
 ### Example: an incomplete fix (Django, CVE-2021-28658)
 
@@ -73,22 +82,46 @@ or run `./demo` and let it clone them on first run: if `.targets/` is missing it
 (full history is needed for the walks), clones both, checks out the commits above, and continues. The first-run
 clone takes about 30 seconds and 400 MB (measured: 20 s, 412 MB); the replay itself takes about 8 seconds.
 
+
+Then the plugin-side commands, on a report directory:
+
+```sh
+.venv/bin/holdfast integrate --report <CLAUDE-SECURITY-dir> --finding F1   # contract, completeness query, record, derived findings
+.venv/bin/holdfast close     --report <CLAUDE-SECURITY-dir> --finding F1   # integrate, then branch + fix commit + record commit + PR
+```
+
+`close` creates a branch from the report's stamped revision, commits the patch (and the patch's test changes as a kept
+test, when it has any) and the record, and opens a PR on your fork via `gh`; it requires `gh auth`, and nothing is
+applied unless you choose close. Both need tier-4 calls: the budget is 150 for the walk plus 12 for the completeness
+exercise, and both are fully used in the committed log, so a fresh call returns UNVERIFIABLE "budget". Raising it is a
+flag (`--cap` on the model client, `EXERCISE_CAP` in `holdfast/complete.py`) and every call is recorded in
+`results/model_calls.jsonl`.
+
 ## Inside Claude Security
 
-The flow, end to end: `/claude-security` **scan** writes `CLAUDE-SECURITY-<ts>/` (report, JSONL, SARIF, revision stamp);
-**Suggest patches** writes `patches/F<n>.patch` with a note beside it; **`/holdfast`** (`.claude/commands/holdfast.md`)
-finds the newest report, lists findings that have a patch, and runs `holdfast integrate --report <dir> --finding F<n>`,
-which builds the contract from the patch applied at the stamped revision, runs the completeness query, appends derived
-findings `F<n>.1`, `F<n>.2` ... to the JSONL with a note each and a `derived_from` field, writes `records/F<n>.json`,
-and appends a Holdfast section to the report; derived findings then go **back through Suggest patches**, and each
-patch ships in **its own PR**. Holdfast writes no patches. The schema it targets, and which fields were confirmed
-against the plugin source versus a real run, is in `NOTES.md`.
+The flow, end to end: `/claude-security` → **Scan codebase** → **Suggest patches** → **Close finding** (shipped here as
+`/holdfast close`) → derived findings back through **Suggest patches** → one PR per patch. Close finding builds the
+contract from the patch applied at the report's stamped revision, runs the completeness query, appends derived findings
+`F<n>.1`, `F<n>.2` ... to the report's JSONL with a note each and a `derived_from` field, commits the patch and the
+record (`.holdfast/records/F<n>.json`) on a branch from the stamped revision, and opens a PR on your fork. Holdfast
+writes no patches; derived findings get theirs through Suggest patches. In the product, Close finding is the fourth
+item in the `/claude-security` menu; the prototype ships it as a separate command because the plugin's menu isn't
+extensible from outside.
 
-Demo path taken: **B**, a hand-built report in the plugin's schema
+```text
+/claude-security
+  1. Scan codebase
+  2. Scan changes
+  3. Suggest patches
+  4. Close finding        (new)
+```
+
+The schema Holdfast reads and writes, and which fields were confirmed against the plugin source versus a real run, is in
+`NOTES.md`. Demo path taken: **B**, a report hand-built in the plugin's schema; the plugin did not produce it
 (`demo_artifacts/claude-security-path-b/`, see its `PROVENANCE.md`). Path A, the real plugin on the fork scoped to
 `django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
-which subagent sessions do not have, so no scan started. On the hand-built report `/holdfast` returned COMPLETE with
-zero derived findings, the same miss as the standalone check, now inside the plugin's artifacts.
+which subagent sessions do not have, so no scan started. If path A runs and succeeds, the three provenance labels in this
+README change; nothing else does.
 
 ## What's real vs stubbed
 
@@ -106,6 +139,8 @@ zero derived findings, the same miss as the standalone check, now inside the plu
 | Sampling over the 40-commit cap | working | Even sampling; labelled commits force-included; evaluated/skipped lists in every verdict of that contract. |
 | `report` / `eval` (Wilson CIs) | working | Markdown; eval scores REGRESSED detection and exact-status agreement against pre-registered labels. |
 | OpenSSH bolt-on | working, tiers 2–4 only | C preprocessor guards treated as guard lines; no build or test. |
+| Close finding / open PR (`holdfast close`) | working | Branch from the stamped revision, fix commit, kept-test commit when the patch has tests, record commit, PR on the fork via `gh`. Demonstrated on the F1 report (hand-built in the plugin's schema; the plugin did not produce it). |
+| Propose patches for derived findings | design; not prototyped | Derived findings go back through Suggest patches; Holdfast writes no patches. |
 | Tier 5 HUMAN | not attempted | Reserved. |
 | Contract re-anchoring after a HELD verdict | not attempted | See "What I'd build next". |
 

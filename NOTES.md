@@ -196,3 +196,6 @@ rule I did not retry. Every field above is therefore [src] or [doc]; none is [ru
 - Tier 1 in integrate: the plugin's patch carries no tests, so `regression_test` is null with the reason recorded.
   A real Suggest-patches patch would usually be the same; the kept test would have to come from the verifier's run.
 - Committed copy: `demo_artifacts/claude-security-path-b/` (the report's `.gitignore` removed for the copy only).
+- `holdfast close` PR body: after adopting the no-COMPLETE rule (the user-facing completeness text lists the consumers
+  examined, then the cannot-verify text; the internal verdict enum stays in the record JSON), PR #2's body was
+  regenerated from the record with `gh pr edit`. No model calls, no re-run of integrate; record data unchanged.
