@@ -1,8 +1,31 @@
 # Holdfast
 
-## Five-minute tour
+## What Holdfast does
 
-**CVE-2021-28658, the miss that matters.** Django's fix `d4d800ca1a` moved HTML-unescaping ahead of path stripping in
+A security scanner verifies a fix once, when the fix is written, and that evidence is lost at merge. Holdfast creates a
+durable remediation record for each fix: the security property the fix establishes, the evidence for it labelled by
+tier (executed test, guard structure, rule, model judgement), the scope the property depends on, and what the record
+cannot verify. It keeps the fix's own test running on every later change that touches that scope and reports, per
+change, whether the property held, moved or regressed. At merge, it asks whether the value the fix protects still flows
+to a consumer the fix did not reach. The design stance: evidence is labelled by tier and never blended, and the tool
+says UNVERIFIABLE rather than guessing.
+
+## What the prototype found
+
+Fixes were rarely undone and often incomplete at merge. Continuous re-verification is not ready: 1 real regression in
+23 flagged, with one root cause (scope defined structurally while the property lives semantically), see
+[results/eval.md](results/eval.md). The completeness check is precise and low-recall on a small pre-registered set:
+1 hit, 3 misses and 0 false flags on 6 contracts, see [results/completeness.md](results/completeness.md).
+
+## See it without running anything
+
+**Demo PR:** [https://github.com/glenfmessenger/django/pull/1](https://github.com/glenfmessenger/django/pull/1). It shows a shipped fix, patches for the two sibling consumers the fix did not reach, and the
+remediation record, with an honest note that the prototype's completeness check did not produce commits 2 and 3; they
+are adapted from the project's own later fix.
+
+### Example: an incomplete fix (Django, CVE-2021-28658)
+
+Django's fix `d4d800ca1a` moved HTML-unescaping ahead of path stripping in
 `MultiPartParser`; the contract's extracted test fails on the parent and passes on the fix
 ([contract](contracts/CVE-2021-28658.json)). The completeness check was then handed every file referencing the fix's
 symbols, saw `django/core/files/uploadedfile.py`, and judged its bare `os.path.basename` "a separate, pre-existing
@@ -11,27 +34,40 @@ defense-in-depth layer" because it did not know that pattern was the one the fix
 and `FieldFile` four weeks later as CVE-2021-31542. What the tool should have produced is shown as a
 [demo PR on a fork](https://github.com/glenfmessenger/django/pull/1): the fix, the two sibling patches adapted from Django's own later fix, and the remediation record.
 
-**CVE-2021-45452, the one it caught.** Asked the same question about `Storage.save()`, the check flagged
+### Example: a caught sibling (Django, CVE-2021-45452)
+
+Asked the same question about `Storage.save()`, the check flagged
 `django/contrib/staticfiles/storage.py` at medium confidence: staticfiles calls `_save()` directly, so the new
 `validate_file_name` guard in `save()` never runs on that path
 ([result](results/completeness/CVE-2021-45452.json)). The file matched the
 [pre-registered expectation](results/completeness_labels.json); the mechanism did not (I had pre-registered the
 overridden-`generate_filename` route that became CVE-2024-39330).
 
-**OpenSSH CVE-2024-6387, regreSSHion.** Walking forward from the 2006 fix, the tool returned REGRESSED at `752250caab`,
+### Example: a regression through a rename (OpenSSH, CVE-2024-6387)
+
+Walking forward from the 2006 fix, the tool returned REGRESSED at `752250caab`,
 where `sigdie` was renamed to `sshsigdie` and the `#ifdef DO_LOG_SAFE_IN_SIGHAND` guard dropped; the tier-4 rationale
 names the rename ([verdict](results/verdicts/CVE-2006-5051/752250caab.json)), and the same stack produced 22 false
 REGRESSED across Django ([eval](results/eval.md), [report](results/report.md)).
 
-Across 20 Django fixes and about 350 later commits, fixes were rarely undone and often incomplete.
-`./demo` replays all three cases in about ten seconds from recorded responses, with no API key.
+## Run the demo
 
-## What it does
+`./demo` replays the three examples (create, walk, complete, report) from recorded model responses and recorded test
+outcomes in about 8 seconds, with no API key. It writes only to `demo_out/`; nothing under `results/` is touched.
 
-Holdfast turns a security fix into a **remediation contract**: the property the fix establishes, its scope, and tiered
-evidence. It re-verifies that property on every later commit touching the scope, one verdict per fix per commit: HELD,
-REGRESSED, INCOMPLETE_AT_MERGE, MOVED or UNVERIFIABLE. Tiers never blend: executed test (1), guard lines (2),
-resurrection rule (3), model judgement (4). Run on 20 Django CVE fixes and the OpenSSH fix behind CVE-2024-6387.
+Prerequisite: the two target repositories must exist as full clones in `.targets/`. Either create them by hand:
+
+```sh
+git clone https://github.com/django/django.git .targets/django
+git -C .targets/django checkout 8d9901c961                    # end of the walk window (2024-12-27)
+git clone https://github.com/openssh/openssh-portable.git .targets/openssh-portable
+git -C .targets/openssh-portable checkout 752250caab           # the regressing commit; anything at or after it works
+./demo
+```
+
+or run `./demo` and let it clone them on first run: if `.targets/` is missing it prints what it is cloning and why
+(full history is needed for the walks), clones both, checks out the commits above, and continues. Expect a few
+minutes and roughly 400 MB the first time.
 
 ## What's real vs stubbed
 

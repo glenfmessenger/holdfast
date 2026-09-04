@@ -6,7 +6,7 @@ tier-1 test outcomes are replayed from the recorded verdicts for the same reason
 ~40 minutes). No API key is used. If a response is not in the recording, the verdict is
 UNVERIFIABLE (not recorded) -- the API is never called. Nothing under results/ is modified;
 everything is written to demo_out/.
-Requires the target clones in .targets/ (see README, "Reproduce from scratch").
+Requires the target clones in .targets/; if missing, clones them on first run (see README, "Run the demo").
 """
 import json, os, sys, time
 from dataclasses import asdict
@@ -106,11 +106,36 @@ def make_replay_run_spec(tests, fix_to_contract):
     return replay_run_spec
 
 
+TARGETS = [  # (path, url, commit to check out, why)
+    (".targets/django", "https://github.com/django/django.git", "8d9901c961",
+     "end of the pinned walk window (2024-12-27); full history is needed to walk fix..end"),
+    (".targets/openssh-portable", "https://github.com/openssh/openssh-portable.git", "752250caab",
+     "the regressing commit for CVE-2024-6387; the walk ends here"),
+]
+
+
+def ensure_targets():
+    import subprocess
+    for path, url, commit, why in TARGETS:
+        if Path(path, ".git").exists():
+            continue
+        print(f"cloning {url} -> {path} (full history, ~minutes) and checking out {commit}: {why}", flush=True)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        r = subprocess.run(["git", "clone", "-q", url, path])
+        if r.returncode != 0:
+            print(f"clone failed for {url}; create it by hand (README, 'Run the demo')"); return False
+        subprocess.run(["git", "-C", path, "checkout", "-q", commit], check=True)
+    return True
+
+
 def main():
     t0 = time.time()
-    for repo in (".targets/django", ".targets/openssh-portable"):
-        if not Path(repo, ".git").exists():
-            print(f"missing {repo}: clone the targets first (README, 'Reproduce from scratch')"); return 2
+    if os.environ.get("HOLDFAST_DEMO_DRY_CLONE"):
+        for path, url, commit, why in TARGETS:
+            print(f"would clone {url} -> {path}, checkout {commit}: {why}")
+        return 0
+    if not ensure_targets():
+        return 2
     model_idx, test_idx = build_index()
     print(f"replay mode: model responses recorded {recorded_date()} "
           f"({len(model_idx)} responses; tier-1 test outcomes replayed from the same run)")
