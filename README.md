@@ -29,12 +29,31 @@ refactoring is the six-month direction; the walk below is the experiment that sh
 Opening the PR is the part you can already do; the rest is new. See Inside Claude Security below for the flow and the
 demo path taken.
 
-## What the prototype found
+## Inside Claude Security
 
-Fixes were rarely undone and often incomplete at merge. Continuous re-verification is not ready: 1 real regression in
-23 flagged: one wall (scope defined structurally while the property lives semantically) and three bugs left untuned, see
-[results/eval.md](results/eval.md). The completeness check is precise and low-recall on a small pre-registered set:
-1 hit, 3 misses and 0 false flags on 6 contracts, see [results/completeness.md](results/completeness.md).
+The flow, end to end: `/claude-security` → **Scan codebase** → **Suggest patches** → **Close finding** (shipped here as
+`/holdfast close`) → derived findings back through **Suggest patches** → one PR per patch. Close finding builds the
+contract from the patch applied at the report's stamped revision, runs the completeness query, appends derived findings
+`F<n>.1`, `F<n>.2` ... to the report's JSONL with a note each and a `derived_from` field, commits the patch and the
+record (`.holdfast/records/F<n>.json`) on a branch from the stamped revision, and opens a PR on your fork. Holdfast
+writes no patches; derived findings get theirs through Suggest patches. In the product, Close finding is the fourth
+item in the `/claude-security` menu; the prototype ships it as a separate command because the plugin's menu isn't
+extensible from outside.
+
+```text
+/claude-security
+  1. Scan codebase
+  2. Scan changes
+  3. Suggest patches
+  4. Close finding        (new)
+```
+
+The schema Holdfast reads and writes, and which fields were confirmed against the plugin source versus a real run, is in
+`NOTES.md`. Demo path taken: **B**, a report hand-built in the plugin's schema; the plugin did not produce it
+(`demo_artifacts/claude-security-path-b/`, see its `PROVENANCE.md`). Path A, the real plugin on the fork scoped to
+`django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
+which subagent sessions do not have, so no scan started. If path A runs and succeeds, the three provenance labels in this
+README change; nothing else does.
 
 ## See it without running anything
 
@@ -77,65 +96,21 @@ where `sigdie` was renamed to `sshsigdie` and the `#ifdef DO_LOG_SAFE_IN_SIGHAND
 names the rename ([verdict](results/verdicts/CVE-2006-5051/752250caab.json)), and the same stack produced 22 false
 REGRESSED across Django ([eval](results/eval.md), [report](results/report.md)).
 
-## Run the demo
+## Try it
 
-`./demo` replays the three examples (create, walk, complete, report) from recorded model responses and recorded test
-outcomes in about 8 seconds, with no API key. It writes only to `demo_out/`; nothing under `results/` is touched.
+**Replay, no key** — `./demo`. First run clones the two targets (~30 s, ~400 MB); replay itself ~8 s; writes only
+`demo_out/`. Replays the three examples from recorded model responses; the banner says so.
 
-Prerequisite: the two target repositories must exist as full clones in `.targets/`. Either create them by hand:
+**The plugin surface, in Claude Code** — open Claude Code in this repository and run `/holdfast` (or "close finding
+F1"). It finds the included demo report, lists patched findings, and offers integrate and close. Integrate needs
+`ANTHROPIC_API_KEY` and the tier-4 budget: the committed log is at the cap (150 walk + 12 exercise), so raise it with
+`--cap` on the model client / `EXERCISE_CAP` in `holdfast/complete.py`; every call is recorded in
+`results/model_calls.jsonl`. Close also needs `gh` authenticated and opens a PR on your own fork. To use `/holdfast` on
+another repository, copy `.claude/commands/holdfast.md` into that repository's `.claude/commands/`. In the product this
+is the fourth item in `/claude-security`; here it's a separate command because the plugin's menu isn't extensible from
+outside.
 
-```sh
-git clone https://github.com/django/django.git .targets/django
-git -C .targets/django checkout 8d9901c961                    # end of the walk window (2024-12-27)
-git clone https://github.com/openssh/openssh-portable.git .targets/openssh-portable
-git -C .targets/openssh-portable checkout 752250caab           # the regressing commit; anything at or after it works
-./demo
-```
-
-or run `./demo` and let it clone them on first run: if `.targets/` is missing it prints what it is cloning and why
-(full history is needed for the walks), clones both, checks out the commits above, and continues. The first-run
-clone takes about 30 seconds and 400 MB (measured: 20 s, 412 MB); the replay itself takes about 8 seconds.
-
-
-Then the plugin-side commands, on a report directory:
-
-```sh
-.venv/bin/holdfast integrate --report <CLAUDE-SECURITY-dir> --finding F1   # contract, completeness query, record, derived findings
-.venv/bin/holdfast close     --report <CLAUDE-SECURITY-dir> --finding F1   # integrate, then branch + fix commit + record commit + PR
-```
-
-`close` creates a branch from the report's stamped revision, commits the patch (and the patch's test changes as a kept
-test, when it has any) and the record, and opens a PR on your fork via `gh`; it requires `gh auth`, and nothing is
-applied unless you choose close. Both need tier-4 calls: the budget is 150 for the walk plus 12 for the completeness
-exercise, and both are fully used in the committed log, so a fresh call returns UNVERIFIABLE "budget". Raising it is a
-flag (`--cap` on the model client, `EXERCISE_CAP` in `holdfast/complete.py`) and every call is recorded in
-`results/model_calls.jsonl`.
-
-## Inside Claude Security
-
-The flow, end to end: `/claude-security` → **Scan codebase** → **Suggest patches** → **Close finding** (shipped here as
-`/holdfast close`) → derived findings back through **Suggest patches** → one PR per patch. Close finding builds the
-contract from the patch applied at the report's stamped revision, runs the completeness query, appends derived findings
-`F<n>.1`, `F<n>.2` ... to the report's JSONL with a note each and a `derived_from` field, commits the patch and the
-record (`.holdfast/records/F<n>.json`) on a branch from the stamped revision, and opens a PR on your fork. Holdfast
-writes no patches; derived findings get theirs through Suggest patches. In the product, Close finding is the fourth
-item in the `/claude-security` menu; the prototype ships it as a separate command because the plugin's menu isn't
-extensible from outside.
-
-```text
-/claude-security
-  1. Scan codebase
-  2. Scan changes
-  3. Suggest patches
-  4. Close finding        (new)
-```
-
-The schema Holdfast reads and writes, and which fields were confirmed against the plugin source versus a real run, is in
-`NOTES.md`. Demo path taken: **B**, a report hand-built in the plugin's schema; the plugin did not produce it
-(`demo_artifacts/claude-security-path-b/`, see its `PROVENANCE.md`). Path A, the real plugin on the fork scoped to
-`django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
-which subagent sessions do not have, so no scan started. If path A runs and succeeds, the three provenance labels in this
-README change; nothing else does.
+To re-run the full evaluation (API key, ~40 minutes), see [REPRODUCING.md](REPRODUCING.md).
 
 ## What's real vs stubbed
 
@@ -210,23 +185,3 @@ common failure in this sample and the one the current scope definition cannot se
 2. **Scope from data flow rather than call graph, with copy detection as well as rename detection.**
 3. **Separate property tests from behaviour tests.**
 
-## Reproduce from scratch
-
-```sh
-uv venv .venv --python 3.13 && uv pip install -e ".[dev]" --python .venv/bin/python
-git clone https://github.com/django/django.git .targets/django            # targets are gitignored, never vendored
-git clone https://github.com/openssh/openssh-portable.git .targets/openssh-portable
-uv python install 3.9 3.11                                                 # old Django does not import on 3.13
-uv venv .targets/venv39 --python 3.9  && uv pip install --python .targets/venv39/bin/python asgiref pytz sqlparse
-uv venv .targets/venv311 --python 3.11 && uv pip install --python .targets/venv311/bin/python asgiref sqlparse
-
-export ANTHROPIC_API_KEY=sk-ant-...        # tier 4. Without it: tier 4 is recorded as "not attempted: no-api-key",
-                                            # properties are templates, and inconclusive walks end UNVERIFIABLE.
-.venv/bin/holdfast create --repo .targets/django --fix d4d800ca1a --advisory CVE-2021-28658
-.venv/bin/holdfast walk   --contract CVE-2021-28658 --repo .targets/django --range d4d800ca1a..8d9901c961
-.venv/bin/holdfast report                   # -> results/report.md
-.venv/bin/holdfast eval --labels results/labels.json   # -> results/eval.md
-./scripts/create_all.sh && ./scripts/walk_all.sh       # everything in contracts/targets.json
-```
-
-`--model` overrides `claude-sonnet-5`; tier 4 is capped at 150 logged calls per run, then UNVERIFIABLE ("budget").

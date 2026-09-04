@@ -19,7 +19,10 @@ Steps:
 1. Read `$ARGUMENTS`. "close ..." / "close finding F1" selects close; "integrate", "check", or no verb selects
    integrate. A token matching `F<n>` names the finding. A path names the report directory.
 2. Locate the report: the named directory, else the `CLAUDE-SECURITY-*` directory in the current repository with the
-   latest timestamp. If none exists, say so and stop: Holdfast runs after `/claude-security` scan and Suggest patches.
+   latest timestamp, else the included demo copy `demo_artifacts/claude-security-path-b/` (hand-built in the plugin's
+   schema; the plugin did not produce it — say so). If none exists, say so and stop: Holdfast runs after
+   `/claude-security` scan and Suggest patches. For the included demo copy the target repository is not beside the
+   report: add `--repo .targets/django` (created by `./demo`) to the command in step 5.
 3. List the findings that have a patch: for each `patches/F<n>.patch`, print id, title, `file:line`, severity and
    confidence from `CLAUDE-SECURITY-RESULTS.jsonl`. Findings without a patch are listed as "no patch — run Suggest
    patches first" and cannot be chosen.
