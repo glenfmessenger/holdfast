@@ -49,12 +49,9 @@ extensible from outside.
   4. Close finding        (new)
 ```
 
-The schema Holdfast reads and writes, and which fields were confirmed against the plugin source versus a real run, is in
-`NOTES.md`. Demo path taken: **B**, a report hand-built in the plugin's schema; the plugin did not produce it
-(`demo_artifacts/claude-security-path-b/`, see its `PROVENANCE.md`). Path A, the real plugin on the fork scoped to
-`django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
-which subagent sessions do not have, so no scan started. If path A runs and succeeds, the three provenance labels in this
-README change; nothing else does.
+The demo report is hand-built in the plugin's schema; the plugin did not produce it
+(`demo_artifacts/claude-security-path-b/`, `PROVENANCE.md`). The schema Holdfast reads and writes, and which fields
+were confirmed against the plugin source versus a real run, is in `NOTES.md`.
 
 ## See it without running anything
 

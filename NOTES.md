@@ -199,3 +199,10 @@ rule I did not retry. Every field above is therefore [src] or [doc]; none is [ru
 - `holdfast close` PR body: after adopting the no-COMPLETE rule (the user-facing completeness text lists the consumers
   examined, then the cannot-verify text; the internal verdict enum stays in the record JSON), PR #2's body was
   regenerated from the record with `gh pr edit`. No model calls, no re-run of integrate; record data unchanged.
+
+## Demo path
+
+Path A, the real plugin on the fork scoped to
+`django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
+which subagent sessions do not have, so no scan started. If path A runs and succeeds, the three provenance labels in this
+README change; nothing else does.
