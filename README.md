@@ -4,10 +4,8 @@
 
 Holdfast is a merge-time completeness check plus an evidence-tiered remediation record, inside Claude Security: the
 completeness and durability layer on top of Claude Security's remediation. It is for AppSec and engineering teams
-already merging Claude-generated patches. It runs on the plugin's own artifacts: `/claude-security` scan, then Suggest patches, then `/holdfast` on a patched
-finding, which asks whether the value the fix protects still flows to a consumer the fix did not reach, appends any
-derived findings to the report in the plugin's schema, and writes a record of the property, the evidence by tier,
-and what could not be verified. Derived findings go back through Suggest patches, one PR per patch.
+already merging Claude-generated patches. It ships as a fourth item in the `/claude-security` menu, Close finding — see Inside Claude Security below for the
+flow and the demo path taken.
 
 The finding behind it: fixes are rarely undone and often incomplete. Of 20 fixes studied, 5 were revisited by a later
 CVE in the same function; none silently regressed in the walked, sampled history. The v1 stance is low recall and zero
