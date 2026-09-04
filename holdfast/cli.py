@@ -51,6 +51,14 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--no-model", action="store_true")
     i.add_argument("--model", default=None)
 
+    cl = sub.add_parser("close", help="integrate, then close the finding as a PR on the fork")
+    cl.add_argument("--report", required=True)
+    cl.add_argument("--finding", required=True)
+    cl.add_argument("--repo")
+    cl.add_argument("--remote", default="fork", help="git remote of the fork to push to and open the PR on")
+    cl.add_argument("--no-model", action="store_true")
+    cl.add_argument("--model", default=None)
+
     args = p.parse_args(argv)
     if args.cmd == "create":
         from .contract import create_command
@@ -58,6 +66,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "walk":
         from .walk import walk_command
         return walk_command(args)
+    if args.cmd == "close":
+        from .close import close_command
+        return close_command(args)
     if args.cmd == "integrate":
         from .integrate import integrate_command
         return integrate_command(args)

@@ -124,9 +124,11 @@ def integrate(report: Path, fid: str, repo_path: Path | None, model: ModelClient
     for i, u in enumerate([u for u in k["uncovered"] if u.get("confidence") in ("medium", "high", "low")], 1):
         derived.append(derived_finding(parent, i, u))
     # write back: JSONL, notes, record, report section
+    existing = {f["id"] for f in findings}
     with (report / JSONL).open("a") as f:
         for d in derived:
-            f.write(json.dumps(d) + "\n")
+            if d["id"] not in existing:
+                f.write(json.dumps(d) + "\n")
     (report / "patches").mkdir(exist_ok=True)
     for d, u in zip(derived, k["uncovered"]):
         (report / "patches" / f"{d['id']}.md").write_text(
@@ -164,8 +166,11 @@ def integrate(report: Path, fid: str, repo_path: Path | None, model: ModelClient
             sec.append(f"| {d['id']} | `{d['symbol']}` | `{d['file']}:{d['line']}` | {d['confidence']} | `patches/{d['id']}.md` |\n")
     else:
         sec.append("\nNo uncovered consumers were listed. Cannot verify: " + record["cannot_verify"] + "\n")
-    with (report / REPORT_MD).open("a") as f:
-        f.write("".join(sec))
+    md = (report / REPORT_MD).read_text()
+    cut = md.find("\n\n## Holdfast\n")
+    if cut >= 0:
+        md = md[:cut]   # re-runs replace the Holdfast section rather than stacking copies
+    (report / REPORT_MD).write_text(md + "".join(sec))
     return {"finding": fid, "verdict": k["verdict"], "derived": [d["id"] for d in derived],
             "record": str(report / "records" / f"{fid}.json"), "protected_value": k.get("protected_value")}
 
