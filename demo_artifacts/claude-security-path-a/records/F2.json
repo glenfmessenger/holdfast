@@ -1,0 +1,339 @@
+{
+  "finding": "F2",
+  "report": "/Users/glen/projects/holdfast/.targets/django-scan/CLAUDE-SECURITY-20260904-161400",
+  "patch": "/Users/glen/projects/holdfast/.targets/django-scan/CLAUDE-SECURITY-20260904-161400/patches/F2.patch",
+  "patch_base_commit": "78fea27f690028204c03c28d821cb0c0240a7398",
+  "scratch_commit": "cadf330d0fb87c141bfe7b71eacec6631ede62f1",
+  "scratch_note": "patch applied at the stamped revision in a scratch worktree; this commit is on no branch and is not pushed",
+  "property": "In MultiPartParser.parse, the filename derived from Content-Disposition must have HTML entities decoded (html.unescape) before any path-separator stripping occurs, and the resulting sanitize_file_name() output must reject '', '.', and '..' outright \u2014 sanitize_file_name(file_name) is the sole gate between the raw header value and file_name used by upload handlers.",
+  "vulnerability": "MultiPartParser.parse called os.path.basename() on the Content-Disposition filename before html.unescape(), so an HTML-encoded path separator (e.g. '&#47;') decoded after basename could reintroduce '/' and '.'/'..' were never rejected, letting attacker-controlled filenames like '..' or reconstructed traversal paths reach downstream upload handlers.",
+  "scope": {
+    "files": [
+      "django/http/multipartparser.py"
+    ],
+    "functions": [
+      "django/http/multipartparser.py::MultiPartParser.parse",
+      "django/http/multipartparser.py::MultiPartParser.sanitize_file_name"
+    ],
+    "symbols": [
+      "sanitize_file_name",
+      "problems",
+      "unescape",
+      "rsplit"
+    ],
+    "guard_lines": [
+      "file_name = self.sanitize_file_name(file_name)",
+      "def sanitize_file_name(self, file_name):",
+      "Sanitize the filename of an upload.",
+      "Remove all possible path separators, even though that might remove more",
+      "than actually required by the target system. Filenames that could",
+      "potentially cause problems (current/parent dir) are also discarded.",
+      "It should be noted that this function could still return un-sanitized",
+      "filenames if the remote user has proper permissions on the file system",
+      "to write to the target directory.",
+      "file_name = html.unescape(file_name)",
+      "file_name = file_name.rsplit('/')[-1]",
+      "file_name = file_name.rsplit('\\\\')[-1].strip()",
+      "if file_name in {'', '.', '..'}:",
+      "return None",
+      "return file_name",
+      "IE_sanitize = sanitize_file_name"
+    ],
+    "callers": []
+  },
+  "evidence_by_tier": [
+    {
+      "tier": 2,
+      "kind": "guard_lines",
+      "detail": "16/16 guard lines present at fix; 1 of them already present at parent (should be 0).",
+      "data": {
+        "present_at_fix": [
+          "file_name = self.sanitize_file_name(file_name)",
+          "def sanitize_file_name(self, file_name):",
+          "Sanitize the filename of an upload.",
+          "Remove all possible path separators, even though that might remove more",
+          "than actually required by the target system. Filenames that could",
+          "potentially cause problems (current/parent dir) are also discarded.",
+          "It should be noted that this function could still return un-sanitized",
+          "filenames if the remote user has proper permissions on the file system",
+          "to write to the target directory.",
+          "file_name = html.unescape(file_name)",
+          "file_name = file_name.rsplit('/')[-1]",
+          "file_name = file_name.rsplit('\\\\')[-1].strip()",
+          "if file_name in {'', '.', '..'}:",
+          "return None",
+          "return file_name",
+          "IE_sanitize = sanitize_file_name"
+        ],
+        "absent_at_fix": [],
+        "present_at_parent": [
+          "return None"
+        ]
+      }
+    },
+    {
+      "tier": 3,
+      "kind": "removed_lines_absent",
+      "detail": "5 removed lines recorded; 0 still present at fix.",
+      "data": {
+        "removed_lines": [
+          "import os",
+          "file_name = os.path.basename(file_name)",
+          "file_name = self.IE_sanitize(html.unescape(file_name))",
+          "def IE_sanitize(self, filename):",
+          "return filename and filename[filename.rfind(\"\\\\\") + 1:].strip()"
+        ],
+        "still_present": []
+      }
+    },
+    {
+      "tier": 1,
+      "kind": "regression_test",
+      "detail": "extracted test(s) ['file_uploads.tests.FileUploadTests.test_blank_filenames', 'file_uploads.tests.FileUploadTests.test_dangerous_file_names', 'file_uploads.tests.MultiParserTests.test_sanitize_file_name', 'file_uploads.tests.MultiParserTests.test_sanitize_invalid_file_name', 'file_uploads.tests.MultiParserTests.test_upload_handler_receives_sanitized_file_name']: FAIL on parent 78fea27f69 (FAILED (failures=10, errors=27)), PASS on fix cadf330d0f.",
+      "data": {
+        "spec": {
+          "kind": "extracted_from_fix_commit_tests",
+          "runner": "django-runtests",
+          "source_commit": "cadf330d0fb87c141bfe7b71eacec6631ede62f1",
+          "test_files": [
+            "tests/file_uploads/tests.py"
+          ],
+          "test_ids": [
+            "file_uploads.tests.FileUploadTests.test_blank_filenames",
+            "file_uploads.tests.FileUploadTests.test_dangerous_file_names",
+            "file_uploads.tests.MultiParserTests.test_sanitize_file_name",
+            "file_uploads.tests.MultiParserTests.test_sanitize_invalid_file_name",
+            "file_uploads.tests.MultiParserTests.test_upload_handler_receives_sanitized_file_name"
+          ],
+          "python_hint": "auto"
+        },
+        "parent": {
+          "outcome": "fail",
+          "summary": "FAILED (failures=10, errors=27)",
+          "tail": "FAIL: test_upload_handler_receives_sanitized_file_name (file_uploads.tests.MultiParserTests) (file_name='/tmp/.')\nThe file name handed to upload handlers has HTML entities decoded\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/glen/projects/holdfast/.targets/worktrees/78fea27f6900/tests/file_uploads/tests.py\", line 737, in test_upload_handler_receives_sanitized_file_name\n    self.assertNotIn('file%s' % i, received)\nAssertionError: 'file23' unexpectedly found in {'file0': 'hax0rd.txt', 'file1': 'hax0rd.txt', 'file2': 'hax0rd.txt', 'file3': 'hax0rd.txt', 'file4': 'hax0rd.txt', 'file5': 'hax0rd.txt', 'file6': 'hax0rd.txt', 'file7': 'hax0rd.txt', 'file8': 'hax0rd.txt', 'file9': 'hax0rd.txt', 'file10': 'hax0rd.txt', 'file11': '../hax0rd.txt', 'file12': '../hax0rd.txt', 'file13': '../hax0rd.txt', 'file14': 'hax0rd.txt', 'file15': 'hax0rd.txt', 'file21': '.', 'file22': '..', 'file23': '.', 'file24': '..', 'file25': '../..', 'file26': '..'}\n\n======================================================================\nFAIL: test_upload_handler_receives_sanitized_file_name (file_uploads.tests.MultiParserTests) (file_name='C:\\\\tmp\\\\..')\nThe file name handed to upload handlers has HTML entities decoded\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/glen/projects/holdfast/.targets/worktrees/78fea27f6900/tests/file_uploads/tests.py\", line 737, in test_upload_handler_receives_sanitized_file_name\n    self.assertNotIn('file%s' % i, received)\nAssertionError: 'file24' unexpectedly found in {'file0': 'hax0rd.txt', 'file1': 'hax0rd.txt', 'file2': 'hax0rd.txt', 'file3': 'hax0rd.txt', 'file4': 'hax0rd.txt', 'file5': 'hax0rd.txt', 'file6': 'hax0rd.txt', 'file7': 'hax0rd.txt', 'file8': 'hax0rd.txt', 'file9': 'hax0rd.txt', 'file10': 'hax0rd.txt', 'file11': '../hax0rd.txt', 'file12': '../hax0rd.txt', 'file13': '../hax0rd.txt', 'file14': 'hax0rd.txt', 'file15': 'hax0rd.txt', 'file21': '.', 'file22': '..', 'file23': '.', 'file24': '..', 'file25': '../..', 'file26': '..'}\n\n======================================================================\nFAIL: test_upload_handler_receives_sanitized_file_name (file_uploads.tests.MultiParserTests) (file_name='..&#47;..')\nThe file name handed to upload handlers has HTML entities decoded\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/glen/projects/holdfast/.targets/worktrees/78fea27f6900/tests/file_uploads/tests.py\", line 737, in test_upload_handler_receives_sanitized_file_name\n    self.assertNotIn('file%s' % i, received)\nAssertionError: 'file25' unexpectedly found in {'file0': 'hax0rd.txt', 'file1': 'hax0rd.txt', 'file2': 'hax0rd.txt', 'file3': 'hax0rd.txt', 'file4': 'hax0rd.txt', 'file5': 'hax0rd.txt', 'file6': 'hax0rd.txt', 'file7': 'hax0rd.txt', 'file8': 'hax0rd.txt', 'file9': 'hax0rd.txt', 'file10': 'hax0rd.txt', 'file11': '../hax0rd.txt', 'file12': '../hax0rd.txt', 'file13': '../hax0rd.txt', 'file14': 'hax0rd.txt', 'file15': 'hax0rd.txt', 'file21': '.', 'file22': '..', 'file23': '.', 'file24': '..', 'file25': '../..', 'file26': '..'}\n\n======================================================================\nFAIL: test_upload_handler_receives_sanitized_file_name (file_uploads.tests.MultiParserTests) (file_name='&#46;&#46;')\nThe file name handed to upload handlers has HTML entities decoded\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"/Users/glen/projects/holdfast/.targets/worktrees/78fea27f6900/tests/file_uploads/tests.py\", line 737, in test_upload_handler_receives_sanitized_file_name\n    self.assertNotIn('file%s' % i, received)\nAssertionError: 'file26' unexpectedly found in {'file0': 'hax0rd.txt', 'file1': 'hax0rd.txt', 'file2': 'hax0rd.txt', 'file3': 'hax0rd.txt', 'file4': 'hax0rd.txt', 'file5': 'hax0rd.txt', 'file6': 'hax0rd.txt', 'file7': 'hax0rd.txt', 'file8': 'hax0rd.txt', 'file9': 'hax0rd.txt', 'file10': 'hax0rd.txt', 'file11': '../hax0rd.txt', 'file12': '../hax0rd.txt', 'file13': '../hax0rd.txt', 'file14': 'hax0rd.txt', 'file15': 'hax0rd.txt', 'file21': '.', 'file22': '..', 'file23': '.', 'file24': '..', 'file25': '../..', 'file26': '..'}\n\n----------------------------------------------------------------------\nRan 5 tests in 0.005s\n\nFAILED (failures=10, errors=27)\nDestroying test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...",
+          "python": ".targets/venv39/bin/python"
+        },
+        "fix": {
+          "outcome": "pass",
+          "summary": "OK",
+          "tail": "Testing against Django installed in '/Users/glen/projects/holdfast/.targets/worktrees/cadf330d0fb8/django'\nImporting application file_uploads\nSkipping setup of unused database(s): other.\nOperations to perform:\n  Synchronize unmigrated apps: auth, contenttypes, file_uploads, messages, sessions, staticfiles\n  Apply all migrations: admin, sites\nSynchronizing apps without migrations:\n  Creating tables...\n    Creating table django_content_type\n    Creating table auth_permission\n    Creating table auth_group\n    Creating table auth_user\n    Creating table django_session\n    Creating table file_uploads_filemodel\n    Running deferred SQL...\nRunning migrations:\n  Applying admin.0001_initial... OK\n  Applying admin.0002_logentry_remove_auto_add... OK\n  Applying admin.0003_logentry_add_action_flag_choices... OK\n  Applying sites.0001_initial... OK\n  Applying sites.0002_alter_domain_unique... OK\nSystem check identified no issues (0 silenced).\n\nCreating test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...\ntest_blank_filenames (file_uploads.tests.FileUploadTests)\nReceiving file upload when filename is blank (before and after ... ok\ntest_dangerous_file_names (file_uploads.tests.FileUploadTests)\nUploaded file names should be sanitized before ever reaching the view. ... ok\ntest_sanitize_file_name (file_uploads.tests.MultiParserTests) ... ok\ntest_sanitize_invalid_file_name (file_uploads.tests.MultiParserTests) ... ok\ntest_upload_handler_receives_sanitized_file_name (file_uploads.tests.MultiParserTests)\nThe file name handed to upload handlers has HTML entities decoded ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.004s\n\nOK\nDestroying test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...",
+          "python": ".targets/venv39/bin/python"
+        }
+      }
+    },
+    {
+      "tier": 4,
+      "kind": "property_derivation",
+      "detail": "model-stated property and sibling judgement (verbatim reply in data)",
+      "data": {
+        "model_reply_verbatim": "{\n  \"vulnerability\": \"MultiPartParser.parse called os.path.basename() on the Content-Disposition filename before html.unescape(), so an HTML-encoded path separator (e.g. '&#47;') decoded after basename could reintroduce '/' and '.'/'..' were never rejected, letting attacker-controlled filenames like '..' or reconstructed traversal paths reach downstream upload handlers.\",\n  \"property\": \"In MultiPartParser.parse, the filename derived from Content-Disposition must have HTML entities decoded (html.unescape) before any path-separator stripping occurs, and the resulting sanitize_file_name() output must reject '', '.', and '..' outright \u2014 sanitize_file_name(file_name) is the sole gate between the raw header value and file_name used by upload handlers.\",\n  \"guard_summary\": \"sanitize_file_name() unescapes HTML entities first, then strips everything up to the last '/' and '\\\\', and returns None for '', '.', or '..', with parse() calling this method (aliased as IE_sanitize) before accepting file_name.\",\n  \"sibling\": {\"covered\": null, \"note\": \"No sibling grep hits were provided (grep returned none), so no other pre-fix instance of basename-before-unescape ordering was found in scope to compare against; cannot confirm whether similar patterns exist elsewhere in the codebase.\"},\n  \"uncertainty\": \"This contract only verifies the ordering and rejection logic within sanitize_file_name/parse in multipartparser.py; it cannot verify that all downstream consumers (Storage backends, custom upload handlers) properly reject or re-sanitize edge cases like drive-letter prefixes (e.g. 'D:foo'), which the patch notes were already reachable and not addressed. It also cannot verify behavior for encodings or separator characters not covered by the '/' and '\\\\' rsplit logic (e.g. other OS-specific separators) beyond what the test suite exercised.\"\n}",
+        "model": "claude-sonnet-5",
+        "guard_summary": "sanitize_file_name() unescapes HTML entities first, then strips everything up to the last '/' and '\\', and returns None for '', '.', or '..', with parse() calling this method (aliased as IE_sanitize) before accepting file_name."
+      }
+    }
+  ],
+  "kept_test": {
+    "paths": [
+      "tests/file_uploads/tests.py"
+    ],
+    "reason": null
+  },
+  "kept_test_reason": null,
+  "completeness": {
+    "contract": "F2",
+    "fix_commit": "cadf330d0fb87c141bfe7b71eacec6631ede62f1",
+    "search_symbols": [
+      "sanitize_file_name",
+      "problems",
+      "unescape",
+      "rsplit"
+    ],
+    "value_variables": [
+      "file_name",
+      "IE_sanitize"
+    ],
+    "files_in_context": [
+      [
+        "django/http/multipartparser.py",
+        20
+      ],
+      [
+        "django/core/files/uploadhandler.py",
+        5
+      ],
+      [
+        "django/forms/fields.py",
+        4
+      ],
+      [
+        "django/utils/html.py",
+        4
+      ],
+      [
+        "django/core/files/storage.py",
+        2
+      ],
+      [
+        "django/core/management/commands/dumpdata.py",
+        2
+      ],
+      [
+        "django/core/management/commands/makemessages.py",
+        2
+      ],
+      [
+        "django/core/signing.py",
+        2
+      ],
+      [
+        "django/contrib/auth/base_user.py",
+        1
+      ],
+      [
+        "django/core/checks/security/base.py",
+        1
+      ],
+      [
+        "django/core/files/uploadedfile.py",
+        1
+      ],
+      [
+        "django/core/mail/message.py",
+        1
+      ],
+      [
+        "django/core/management/commands/check.py",
+        1
+      ],
+      [
+        "django/core/management/commands/loaddata.py",
+        1
+      ],
+      [
+        "django/core/serializers/base.py",
+        1
+      ],
+      [
+        "django/core/validators.py",
+        1
+      ],
+      [
+        "django/db/backends/mysql/validation.py",
+        1
+      ],
+      [
+        "django/db/migrations/serializer.py",
+        1
+      ],
+      [
+        "django/db/models/options.py",
+        1
+      ],
+      [
+        "django/db/models/query.py",
+        1
+      ],
+      [
+        "django/db/models/sql/compiler.py",
+        1
+      ],
+      [
+        "django/db/models/sql/query.py",
+        1
+      ],
+      [
+        "django/http/request.py",
+        1
+      ],
+      [
+        "django/template/defaulttags.py",
+        1
+      ],
+      [
+        "django/template/utils.py",
+        1
+      ]
+    ],
+    "files_excluded_by_cap": [
+      [
+        "django/urls/resolvers.py",
+        1
+      ],
+      [
+        "django/utils/functional.py",
+        1
+      ],
+      [
+        "django/utils/module_loading.py",
+        1
+      ],
+      [
+        "django/utils/translation/__init__.py",
+        1
+      ],
+      [
+        "setup.py",
+        1
+      ]
+    ],
+    "context_truncated": false,
+    "verdict": "COMPLETE",
+    "protected_value": "the client-supplied upload filename parsed from the Content-Disposition header in MultiPartParser.parse (file_name)",
+    "uncovered": [
+      {
+        "file": "django/core/files/uploadedfile.py",
+        "function": "_set_name",
+        "lines": "name = os.path.basename(name)",
+        "reason": "This setter still runs os.path.basename() on the name assigned to UploadedFile.name, independent of the new sanitize_file_name gate. It's not in the scope of the F2 fix and doesn't unescape HTML entities, but since new_file() in TemporaryFileUploadHandler/InMemoryUploadedFile constructs UploadedFile with self.file_name (already sanitized), this consumer receives an already-sanitized value in the normal flow. However, if any other caller passes an unsanitized, HTML-encoded name directly to UploadedFile(name=...), basename() would run pre-unescape here, but this is outside the file_name flow controlled by the guard and not shown to be reachable with raw header data in the excerpts.",
+        "confidence": "low"
+      }
+    ],
+    "covered": [
+      {
+        "file": "django/http/multipartparser.py",
+        "function": "MultiPartParser.parse",
+        "reason": "The sole point where the raw Content-Disposition filename is converted: 'file_name = force_str(file_name, encoding, errors='replace'); file_name = self.sanitize_file_name(file_name)' at lines 214-215, replacing the old os.path.basename()+IE_sanitize(html.unescape()) sequence. sanitize_file_name() now calls html.unescape() before rsplit('/') and rsplit('\\\\'), and rejects '', '.', '..'."
+      },
+      {
+        "file": "django/core/files/uploadhandler.py",
+        "function": "FileUploadHandler.new_file / TemporaryFileUploadHandler.new_file / MemoryFileUploadHandler.file_complete",
+        "reason": "These consumers (new_file, TemporaryUploadedFile, InMemoryUploadedFile) all receive file_name only after MultiPartParser.parse has already called sanitize_file_name(), e.g. 'handler.new_file(field_name, file_name, content_type, ...)' at line 234, using the already-sanitized file_name from line 215."
+      }
+    ],
+    "note": "",
+    "value_note": "Single value: the raw 'filename' from disposition.get('filename'), which after force_str is passed through sanitize_file_name() before being handed to upload handlers.",
+    "context_sufficient": true,
+    "context_note": "The fix diff and multipartparser.py excerpt fully show the guard applied at the only place the raw Content-Disposition filename is processed before being passed to upload handlers. uploadhandler.py and uploadedfile.py excerpts confirm downstream consumers receive the already-sanitized value from this single call site. No other file in the provided excerpts references or reprocesses the raw disposition filename, so coverage appears complete for the shown call graph."
+  },
+  "completeness_model_reply_verbatim": "{\n  \"protected_value\": \"the client-supplied upload filename parsed from the Content-Disposition header in MultiPartParser.parse (file_name)\",\n  \"value_note\": \"Single value: the raw 'filename' from disposition.get('filename'), which after force_str is passed through sanitize_file_name() before being handed to upload handlers.\",\n  \"uncovered\": [\n    {\n      \"file\": \"django/core/files/uploadedfile.py\",\n      \"function\": \"_set_name\",\n      \"lines\": \"name = os.path.basename(name)\",\n      \"reason\": \"This setter still runs os.path.basename() on the name assigned to UploadedFile.name, independent of the new sanitize_file_name gate. It's not in the scope of the F2 fix and doesn't unescape HTML entities, but since new_file() in TemporaryFileUploadHandler/InMemoryUploadedFile constructs UploadedFile with self.file_name (already sanitized), this consumer receives an already-sanitized value in the normal flow. However, if any other caller passes an unsanitized, HTML-encoded name directly to UploadedFile(name=...), basename() would run pre-unescape here, but this is outside the file_name flow controlled by the guard and not shown to be reachable with raw header data in the excerpts.\",\n      \"confidence\": \"low\"\n    }\n  ],\n  \"covered\": [\n    {\n      \"file\": \"django/http/multipartparser.py\",\n      \"function\": \"MultiPartParser.parse\",\n      \"reason\": \"The sole point where the raw Content-Disposition filename is converted: 'file_name = force_str(file_name, encoding, errors='replace'); file_name = self.sanitize_file_name(file_name)' at lines 214-215, replacing the old os.path.basename()+IE_sanitize(html.unescape()) sequence. sanitize_file_name() now calls html.unescape() before rsplit('/') and rsplit('\\\\\\\\'), and rejects '', '.', '..'.\"\n    },\n    {\n      \"file\": \"django/core/files/uploadhandler.py\",\n      \"function\": \"FileUploadHandler.new_file / TemporaryFileUploadHandler.new_file / MemoryFileUploadHandler.file_complete\",\n      \"reason\": \"These consumers (new_file, TemporaryUploadedFile, InMemoryUploadedFile) all receive file_name only after MultiPartParser.parse has already called sanitize_file_name(), e.g. 'handler.new_file(field_name, file_name, content_type, ...)' at line 234, using the already-sanitized file_name from line 215.\"\n    }\n  ],\n  \"context_sufficient\": true,\n  \"context_note\": \"The fix diff and multipartparser.py excerpt fully show the guard applied at the only place the raw Content-Disposition filename is processed before being passed to upload handlers. uploadhandler.py and uploadedfile.py excerpts confirm downstream consumers receive the already-sanitized value from this single call site. No other file in the provided excerpts references or reprocesses the raw disposition filename, so coverage appears complete for the shown call graph.\"\n}",
+  "cannot_verify": "This contract only verifies the ordering and rejection logic within sanitize_file_name/parse in multipartparser.py; it cannot verify that all downstream consumers (Storage backends, custom upload handlers) properly reject or re-sanitize edge cases like drive-letter prefixes (e.g. 'D:foo'), which the patch notes were already reachable and not addressed. It also cannot verify behavior for encodings or separator characters not covered by the '/' and '\\' rsplit logic (e.g. other OS-specific separators) beyond what the test suite exercised. Consumers outside this repository (third-party packages, deployment configuration) are not examined; the consumer list is only as complete as the symbol references the query was shown.",
+  "derived_findings": [
+    "F2.1"
+  ],
+  "generated_at": "2026-09-04T17:18:33Z",
+  "provenance": "holdfast integrate (prototype); plugin artifacts above were not modified except the appends listed",
+  "close": {
+    "branch": "holdfast/close-F2-78fea27f69",
+    "base_branch": "holdfast-base-78fea27f69",
+    "base_commit": "78fea27f690028204c03c28d821cb0c0240a7398",
+    "commits": [
+      {
+        "role": "fix",
+        "sha": "11c5311ca3e5b8a900987ae98f5df1db3f20da16",
+        "subject": "Multipart filename sanitized before HTML-unescape, allowing path separators to be reintroduced"
+      },
+      {
+        "role": "kept test",
+        "sha": "3c3b292b10ca804da04138528a9d1391735f762c",
+        "subject": "Kept test for F2"
+      },
+      {
+        "role": "record",
+        "sha": "ca605cfa63fccf155cdb6ac704db269c35c8026b",
+        "subject": "Add Holdfast record for F2"
+      }
+    ],
+    "provenance": "Patch produced by Claude Security plugin.",
+    "pr_url": "https://github.com/glenfmessenger/django/pull/3"
+  }
+}

@@ -38,7 +38,9 @@ class ModelClient:
     def calls_so_far(self) -> int:
         if not self.log_path.exists():
             return 0
-        return sum(1 for line in self.log_path.read_text().splitlines() if line.strip())
+        # budget notes ({"purpose": "budget", ...}) record cap changes and are not calls
+        return sum(1 for line in self.log_path.read_text().splitlines()
+                   if line.strip() and '"purpose": "budget"' not in line)
 
     def budget_left(self) -> int:
         return self.cap - self.calls_so_far()

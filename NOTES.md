@@ -177,6 +177,22 @@ after demo path A).
 
 ### What was confirmed against a real run
 
+**Path A ran on 2026-09-04** (plugin v0.11.0, `.targets/django-scan/CLAUDE-SECURITY-20260904-161400/`). Checked
+field by field against that report:
+
+- Report directory, `.gitignore` = `*`, RESULTS.md / .jsonl / .sarif, `CLAUDE-SECURITY-REVISION-78fea27f6900.json`: **[run] confirmed**.
+- Finding fields and order (id ... declared_line, claudeSecurityPluginFindingId last): **[run] confirmed**, identical to the source.
+- Revision stamp: **[run] confirmed with two corrections** to what I had inferred. `mode` is `"scan"` for a codebase scan
+  (I had written `"codebase"` in the hand-built stamp); `revision` carries `versioned`, `commit`, `branch`, `dirty`
+  (I had only `commit`, `dirty`). `revision_source` was `"self-reported"`. `integrate` reads only `revision.commit`,
+  so no reader change was needed.
+- `patches/`: **[run] confirmed with additions**. `patches.jsonl` records carry `base`, `untested`, `tests_run`,
+  `reviewed_paths`, `apply_check`, `decline_reason` in addition to id/status/patch/note/claims/diffstat, and each claim
+  is `{state, evidence}` (I had written `reason`). `F<n>.patch` begins with the `#` header comment as the source says;
+  `patch_body()` strips it and `git apply` took the diff cleanly. No reader change needed.
+- Nothing `integrate` expected differed in a way that broke it; the only inaccuracies were in my hand-built path-B stamp.
+
+Earlier text, kept for the record:
 Nothing yet. Demo path A (the real plugin on the fork at 78fea27f69, scoped to django/http/, in a separate session)
 did not run: the plugin's orchestrator, dispatched as a subagent, stopped at its tool check because the Workflow tool is
 not available to subagents in this session, so no scan started and no tokens went into scanning. Per the one-attempt
@@ -206,3 +222,30 @@ Path A, the real plugin on the fork scoped to
 `django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
 which subagent sessions do not have, so no scan started. If path A runs and succeeds, the three provenance labels in this
 README change; nothing else does.
+
+### Path A outcome (2026-09-04)
+
+- One scan, scoped to `django/http/` at 78fea27f69, effort medium, 1103 s. Two findings, both MEDIUM:
+  F1 "Unbounded number of uploaded file parts allows resource-exhaustion DoS" (medium confidence, multipartparser.py:235,
+  CWE-770) and F2 "Multipart filename sanitized before HTML-unescape, allowing path separators to be reintroduced"
+  (low confidence, 2 of 3 verifiers, multipartparser.py:217, CWE-22). F2 is the CVE-2021-28658 bug.
+- F2's low confidence rests on the scanner's rationale that Django's built-in upload handlers re-basename the value
+  downstream (`UploadedFile._set_name`), so exploitation needs a custom handler. That is the scanner's own version of
+  the sibling judgement Holdfast's query made on the hand-built F1 report: the same `os.path.basename` in
+  `uploadedfile.py` read as a covering layer.
+- Suggest patches wrote `F2.patch`: `sanitize_file_name()` with `html.unescape` first, then `rsplit('/')` and
+  `rsplit('\\')`, and `None` for `''`, `'.'`, `'..'`, with tests. That is Django's CVE-2021-31542 shape
+  (0b79eb3691), not the `os.path.basename`-last shape of d4d800ca1a; the patch is the stronger of the two.
+- `holdfast close --cap 164` (cap raised from 162 for this run only; recorded as the first log line of the run):
+  2 tier-4 calls. Tier 1 extracted five test ids from the patch and they fail on the parent (10 failures, 27 errors)
+  and pass on the patch, so the kept test is real this time. Completeness: verdict COMPLETE, but the query listed
+  `uploadedfile.py::_set_name` at **low** confidence, so `F2.1` was appended as a derived finding while the verdict
+  stayed COMPLETE (threshold medium/high, unchanged). On the hand-built report the same consumer was judged covered;
+  the difference is the input (the plugin's patch note and finding text were in the advisory), not the query.
+- PR: https://github.com/glenfmessenger/django/pull/3 — fix commit, kept-test commit, record commit. The PR body's
+  completeness wording was changed (renderer only) to say "no uncovered consumers at medium or high confidence ...;
+  1 listed at low confidence" when a low-confidence consumer exists, and PR #3's body was regenerated with `gh pr edit`;
+  record data unchanged. A `--cap` CLI flag now exists on integrate/close/complete; budget lines in the call log
+  (`"purpose": "budget"`) are not counted as calls.
+- Committed copy: `demo_artifacts/claude-security-path-a/` (PROVENANCE.md lists what the plugin wrote and what
+  Holdfast added). The hand-built path-B copy stays for the record.

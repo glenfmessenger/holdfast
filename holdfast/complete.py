@@ -148,7 +148,7 @@ def complete_command(args) -> int:
     c = Contract.load(args.contract)
     repo = Repo(Path(args.repo))
     # Own budget: the run-wide cap (150) is already spent; allow exactly EXERCISE_CAP more, all logged as before.
-    model = ModelClient(args.model, disabled=args.no_model, cap=150 + EXERCISE_CAP)
+    model = ModelClient(args.model, disabled=args.no_model, cap=(args.cap or 150 + EXERCISE_CAP))
     r = complete_contract(c, repo, model)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / f"{c.id}.json"

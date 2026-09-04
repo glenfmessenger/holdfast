@@ -1,0 +1,265 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Claude Security Plugin for Claude Code",
+          "organization": "Anthropic",
+          "informationUri": "https://claude.com/product/claude-security",
+          "version": "0.11.0",
+          "rules": [
+            {
+              "id": "CWE-770",
+              "name": "AllocationOfResourcesWithoutLimitsOrThrottling",
+              "shortDescription": {
+                "text": "Allocation of Resources Without Limits or Throttling"
+              },
+              "fullDescription": {
+                "text": "Allocation of Resources Without Limits or Throttling (CWE-770, CWE 4.20): findings whose CWE is this entry of the Simplified Mapping view or rolls up to it, reported by Claude Security Plugin for Claude Code from static review of the source."
+              },
+              "help": {
+                "text": "Each alert's message names the finding's own CWE and states the impact, exploit scenario, preconditions and recommended fix; the finding appears under its F<n> id in CLAUDE-SECURITY-RESULTS.md."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/770.html",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-770"
+                ]
+              }
+            },
+            {
+              "id": "CWE-22",
+              "name": "PathTraversal",
+              "shortDescription": {
+                "text": "Path Traversal"
+              },
+              "fullDescription": {
+                "text": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal') (CWE-22, CWE 4.20): findings whose CWE is this entry of the Simplified Mapping view or rolls up to it, reported by Claude Security Plugin for Claude Code from static review of the source."
+              },
+              "help": {
+                "text": "Each alert's message names the finding's own CWE and states the impact, exploit scenario, preconditions and recommended fix; the finding appears under its F<n> id in CLAUDE-SECURITY-RESULTS.md."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/22.html",
+              "properties": {
+                "tags": [
+                  "security",
+                  "external/cwe/cwe-22"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "automationDetails": {
+        "id": "claude-security-plugin/scan/django/http/84f16690-b825-4e0a-a58c-b2e76bb3828e",
+        "guid": "84f16690-b825-4e0a-a58c-b2e76bb3828e"
+      },
+      "invocations": [
+        {
+          "executionSuccessful": true
+        }
+      ],
+      "originalUriBaseIds": {
+        "%SRCROOT%": {
+          "description": {
+            "text": "The top level of the scanned repository, or the scanned directory when the scan did not run inside a git checkout."
+          }
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CWE-770",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "Unbounded number of uploaded file parts allows resource-exhaustion DoS.\n\nThe multipart parser gates FIELD parts against settings.DATA_UPLOAD_MAX_NUMBER_FIELDS, but the FILE branch (item_type == FILE) has no per-request limit on the number of file parts; each part invokes handler.new_file(), which for the default TemporaryFileUploadHandler creates a new on-disk temporary file. An unauthenticated attacker controls the number of parts via the request body.\n\nImpact: A single multipart request containing a very large number of small file parts causes creation of a correspondingly large number of temporary files and handler invocations, exhausting file descriptors, inodes, disk space, and CPU on the server, resulting in denial of service. There is no default Django-level cap on the number of file parts (no DATA_UPLOAD_MAX_NUMBER_FILES setting exists in this version).\n\nExploit scenario: An attacker POSTs multipart/form-data to any view that reads request.POST/request.FILES (or triggers upload parsing). The body contains hundreds of thousands of minimal file parts (each ~70 bytes: a Content-Disposition with a filename and empty content). The parser calls new_file() for every part, spawning that many NamedTemporaryFile handles and consuming server resources until file descriptors/inodes/disk are exhausted.\n\nPreconditions: A request path that causes multipart parsing (any view accessing request.POST or request.FILES on a POST, or middleware doing so); Default or TemporaryFileUploadHandler in FILE_UPLOAD_HANDLERS; No front-end proxy imposing a strict request-body-size or part-count limit.\n\nRecommendation: Introduce and enforce a DATA_UPLOAD_MAX_NUMBER_FILES limit in the FILE branch analogous to the DATA_UPLOAD_MAX_NUMBER_FIELDS check, raising TooManyFilesSent when exceeded (this is the fix later shipped as CVE-2023-24580 mitigation).\n\nCWE-770. Severity MEDIUM, confidence medium."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "django/http/multipartparser.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 235,
+                  "snippet": {
+                    "text": "                                handler.new_file("
+                  }
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "MultiPartParser.parse",
+                  "fullyQualifiedName": "MultiPartParser.parse"
+                }
+              ]
+            }
+          ],
+          "properties": {
+            "claudeSecurityPlugin": {
+              "id": "F1",
+              "title": "Unbounded number of uploaded file parts allows resource-exhaustion DoS",
+              "impact": "A single multipart request containing a very large number of small file parts causes creation of a correspondingly large number of temporary files and handler invocations, exhausting file descriptors, inodes, disk space, and CPU on the server, resulting in denial of service. There is no default Django-level cap on the number of file parts (no DATA_UPLOAD_MAX_NUMBER_FILES setting exists in this version).",
+              "file": "django/http/multipartparser.py",
+              "line": 235,
+              "description": "The multipart parser gates FIELD parts against settings.DATA_UPLOAD_MAX_NUMBER_FIELDS, but the FILE branch (item_type == FILE) has no per-request limit on the number of file parts; each part invokes handler.new_file(), which for the default TemporaryFileUploadHandler creates a new on-disk temporary file. An unauthenticated attacker controls the number of parts via the request body.",
+              "exploit_scenario": "An attacker POSTs multipart/form-data to any view that reads request.POST/request.FILES (or triggers upload parsing). The body contains hundreds of thousands of minimal file parts (each ~70 bytes: a Content-Disposition with a filename and empty content). The parser calls new_file() for every part, spawning that many NamedTemporaryFile handles and consuming server resources until file descriptors/inodes/disk are exhausted.",
+              "preconditions": [
+                "A request path that causes multipart parsing (any view accessing request.POST or request.FILES on a POST, or middleware doing so)",
+                "Default or TemporaryFileUploadHandler in FILE_UPLOAD_HANDLERS",
+                "No front-end proxy imposing a strict request-body-size or part-count limit"
+              ],
+              "category": "Allocation of Resources Without Limits or Throttling",
+              "severity": "MEDIUM",
+              "confidence": "medium",
+              "recommendation": "Introduce and enforce a DATA_UPLOAD_MAX_NUMBER_FILES limit in the FILE branch analogous to the DATA_UPLOAD_MAX_NUMBER_FIELDS check, raising TooManyFilesSent when exceeded (this is the fix later shipped as CVE-2023-24580 mitigation).",
+              "cwe_id": "CWE-770",
+              "snippet": "                                handler.new_file(",
+              "symbol": "MultiPartParser.parse",
+              "declared_line": 235,
+              "claudeSecurityPluginFindingId": "v3:ae07d8dd9978bbe507fcf0e8148b78cc588ef460288b3d151c4dbf5970fc21b2",
+              "verification": {
+                "panel": {
+                  "true": 3,
+                  "false": 0,
+                  "voters": 3
+                }
+              }
+            }
+          }
+        },
+        {
+          "ruleId": "CWE-22",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "Multipart filename sanitized before HTML-unescape, allowing path separators to be reintroduced.\n\nThe uploaded filename from the attacker-controlled Content-Disposition header is passed through os.path.basename() (line 215) BEFORE html.unescape() (line 217); html.unescape can reintroduce '/' (e.g. '&#47;') and path components after basename has already run, so the value handed to upload handlers can contain traversal sequences.\n\nImpact: The parser emits file names such as '../../../x' or '..' from crafted/HTML-encoded Content-Disposition filenames. This is the weakness class behind CVE-2021-31542 (this snapshot dated 2021-04-06 predates the May 2021 fix that reordered sanitization and added validate_file_name). Whether traversal reaches the filesystem depends on downstream consumers; django/core/files/uploadedfile.py re-applies os.path.basename (neutralizing embedded '/'), but a name of exactly '..' still passes through both basename calls and can cause directory traversal when the application saves the file under uploaded_file.name via Storage.\n\nExploit scenario: An attacker submits multipart/form-data with Content-Disposition filename='..' (or an HTML-encoded separator sequence). The parser produces file_name='..', which survives UploadedFile._set_name's basename. An application that saves the upload using the provided name (a common pattern) then writes/overwrites a path one directory above the intended upload location.\n\nPreconditions: Application saves uploaded files using the client-supplied name (uploaded_file.name) via a Storage backend; Downstream Storage does not independently reject '..'/path components (out of scope for django/http).\n\nRecommendation: Apply html.unescape and force_str before os.path.basename, and explicitly reject names that are '.', '..', or contain path separators (as done by the later validate_file_name fix).\n\nCWE-22. Severity MEDIUM, confidence low."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "django/http/multipartparser.py",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 217,
+                  "snippet": {
+                    "text": "                        file_name = self.IE_sanitize(html.unescape(file_name))"
+                  }
+                }
+              },
+              "logicalLocations": [
+                {
+                  "name": "MultiPartParser.parse",
+                  "fullyQualifiedName": "MultiPartParser.parse"
+                }
+              ]
+            }
+          ],
+          "properties": {
+            "claudeSecurityPlugin": {
+              "id": "F2",
+              "title": "Multipart filename sanitized before HTML-unescape, allowing path separators to be reintroduced",
+              "impact": "The parser emits file names such as '../../../x' or '..' from crafted/HTML-encoded Content-Disposition filenames. This is the weakness class behind CVE-2021-31542 (this snapshot dated 2021-04-06 predates the May 2021 fix that reordered sanitization and added validate_file_name). Whether traversal reaches the filesystem depends on downstream consumers; django/core/files/uploadedfile.py re-applies os.path.basename (neutralizing embedded '/'), but a name of exactly '..' still passes through both basename calls and can cause directory traversal when the application saves the file under uploaded_file.name via Storage.",
+              "file": "django/http/multipartparser.py",
+              "line": 217,
+              "description": "The uploaded filename from the attacker-controlled Content-Disposition header is passed through os.path.basename() (line 215) BEFORE html.unescape() (line 217); html.unescape can reintroduce '/' (e.g. '&#47;') and path components after basename has already run, so the value handed to upload handlers can contain traversal sequences.",
+              "exploit_scenario": "An attacker submits multipart/form-data with Content-Disposition filename='..' (or an HTML-encoded separator sequence). The parser produces file_name='..', which survives UploadedFile._set_name's basename. An application that saves the upload using the provided name (a common pattern) then writes/overwrites a path one directory above the intended upload location.",
+              "preconditions": [
+                "Application saves uploaded files using the client-supplied name (uploaded_file.name) via a Storage backend",
+                "Downstream Storage does not independently reject '..'/path components (out of scope for django/http)"
+              ],
+              "category": "Path Traversal",
+              "severity": "MEDIUM",
+              "confidence": "low",
+              "recommendation": "Apply html.unescape and force_str before os.path.basename, and explicitly reject names that are '.', '..', or contain path separators (as done by the later validate_file_name fix).",
+              "cwe_id": "CWE-22",
+              "snippet": "                        file_name = self.IE_sanitize(html.unescape(file_name))",
+              "symbol": "MultiPartParser.parse",
+              "declared_line": 217,
+              "claudeSecurityPluginFindingId": "v3:0eaea912728462dcec6239a0cd4a4166d11de737335c85466ea7dee453ba4dbc",
+              "verification": {
+                "panel": {
+                  "true": 2,
+                  "false": 1,
+                  "voters": 3
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "claudeSecurityPlugin": {
+          "generated_at": "2026-09-04T16:32:32+00:00",
+          "scan_id": "84f16690-b825-4e0a-a58c-b2e76bb3828e",
+          "mode": "scan",
+          "scan_prefix": "",
+          "scope": [
+            "django/http"
+          ],
+          "revision": {
+            "versioned": true,
+            "commit": "78fea27f690028204c03c28d821cb0c0240a7398",
+            "branch": "HEAD",
+            "dirty": false
+          },
+          "revision_source": "self-reported",
+          "effort": "medium",
+          "run_shape": {
+            "requested_effort": "medium",
+            "collapsed": "small-scope",
+            "source": "coverage.json",
+            "diff_files": null,
+            "diff_lines": null,
+            "scope_files": 5,
+            "empty_diff": false,
+            "empty_scope": false,
+            "researchers_dispatched": 2,
+            "skipped_components": [],
+            "completeness_check_outcome": "not-applicable",
+            "unaccounted_top_level_dirs": [],
+            "inventory_fallback": null,
+            "top_level_dir_count": null,
+            "target_files": 5,
+            "component_cap": null,
+            "research_coverage": null
+          },
+          "findings": {
+            "total": 2,
+            "critical": 0,
+            "high": 0,
+            "medium": 2,
+            "low": 0
+          },
+          "verification": {
+            "status": "verified",
+            "candidates": 2,
+            "candidates_deduped": 2,
+            "panel_votes": 6,
+            "panel_reviewed_findings": 2,
+            "panel_quorum_findings": 2,
+            "unreviewed_candidate_sites": 0,
+            "incomplete_panel_candidates": 0,
+            "attested_findings": 0,
+            "reason": null,
+            "researchers_dispatched": 2,
+            "researchers_returned": 2
+          },
+          "target_kind": "git-remote"
+        }
+      },
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "https://github.com/django/django",
+          "revisionId": "78fea27f690028204c03c28d821cb0c0240a7398"
+        }
+      ]
+    }
+  ]
+}

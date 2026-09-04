@@ -118,8 +118,8 @@ def close(report: Path, fid: str, repo_path: Path | None, model: ModelClient, re
                 "--title", f"{fid}: {parent['title']} — closed by Holdfast", "--body-file", str(body_path)])
     record["close"]["pr_url"] = url
     (report / "records" / f"{fid}.json").write_text(json.dumps(record, indent=2) + "\n")
-    return {"finding": fid, "verdict": k["verdict"], "derived": derived, "commits": record["close"]["commits"],
-            "kept_test": kept_test, "pr_url": url}
+    return {"finding": fid, "verdict": record["completeness"]["verdict"], "derived": record.get("derived_findings") or [],
+            "commits": record["close"]["commits"], "kept_test": kept_test, "pr_url": url}
 
 
 def render_pr_body(record: dict, title: str, fid: str) -> str:
@@ -138,10 +138,15 @@ def render_pr_body(record: dict, title: str, fid: str) -> str:
     ex_lines = "\n".join(f"- `{c.get('function')}` in `{c.get('file')}` — {c.get('reason', '')}" for c in examined) or "- (none listed)"
     kept_line = (f"commit `{kept_c['sha'][:10]}`, paths {', '.join(kept['paths'])}" if kept.get("paths") and kept_c
                  else f"null — {kept.get('reason')}")
+    low = [u for u in (k.get("uncovered") or []) if u.get("confidence") not in ("medium", "high")]
     if derived:
-        derived_text = ", ".join(derived) + ". Derived findings go back through Suggest patches; no sibling patches are in this PR."
+        derived_text = (", ".join(derived) + (f" ({len(low)} listed at low confidence, below the verdict threshold)" if low else "")
+                        + ". Derived findings go back through Suggest patches; no sibling patches are in this PR.")
     else:
         derived_text = "none. Derived findings, when listed, go back through Suggest patches; no sibling patches are in this PR."
+    headline = (f"No uncovered consumers at medium or high confidence among the {len(examined) + len(low)} examined; "
+                f"{len(low)} listed at low confidence (see derived findings)" if low
+                else f"No uncovered consumers found among the {len(examined)} examined")
     return f"""**Closed by Holdfast** (`holdfast close`). Base `{cl['base_branch']}` is the report's stamped revision {cl['base_commit'][:10]}. {cl['provenance']}
 
 ## Property
@@ -157,9 +162,10 @@ def render_pr_body(record: dict, title: str, fid: str) -> str:
 
 ## Completeness
 
-No uncovered consumers found among the {len(examined)} examined (protected value: {k.get('protected_value')}; {len(k.get('files_in_context', []))} files in context):
+{headline} (protected value: {k.get('protected_value')}; {len(k.get('files_in_context', []))} files in context):
 
 {ex_lines}
+{chr(10).join(f"- `{u.get('function')}` in `{u.get('file')}` — listed at {u.get('confidence')} confidence: {u.get('reason', '')}" for u in low)}
 
 Cannot verify: {record['cannot_verify']}
 
@@ -171,7 +177,7 @@ Nothing in this PR was applied without the user choosing close.
 
 
 def close_command(args) -> int:
-    model = ModelClient(args.model, disabled=args.no_model, cap=150 + EXERCISE_CAP)
+    model = ModelClient(args.model, disabled=args.no_model, cap=(args.cap or 150 + EXERCISE_CAP))
     r = close(Path(args.report), args.finding, Path(args.repo) if args.repo else None, model, remote=args.remote)
     print(json.dumps(r, indent=2))
     print(r["pr_url"])

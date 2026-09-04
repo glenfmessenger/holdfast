@@ -49,19 +49,19 @@ extensible from outside.
   4. Close finding        (new)
 ```
 
-The demo report is hand-built in the plugin's schema; the plugin did not produce it
-(`demo_artifacts/claude-security-path-b/`, `PROVENANCE.md`). The schema Holdfast reads and writes, and which fields
+The demo report was produced by the Claude Security plugin v0.11.0 on 2026-09-04
+(`demo_artifacts/claude-security-path-a/`, `PROVENANCE.md`). The schema Holdfast reads and writes, and which fields
 were confirmed against the plugin source versus a real run, is in `NOTES.md`.
 
 ## See it without running anything
 
 **Two PRs on a fork, with their roles.**
 
-- **What the tool produced:** [PR #2](https://github.com/glenfmessenger/django/pull/2), opened by `holdfast close` on the F1 report (hand-built in the plugin's
-  schema; the plugin did not produce it). A fix commit, a record commit, cannot-verify stated, and no sibling patches,
-  because the query judged `uploadedfile.py` covered. Kept test: null in the demo because the hand-built patch carries no
-  tests; in the real flow it comes from the patch's own test changes when the fix includes them, as Django's actual
-  CVE-2021-28658 commit did.
+- **What the tool produced:** [PR #3](https://github.com/glenfmessenger/django/pull/3), opened by `holdfast close` on finding F2 of a report produced by the Claude
+  Security plugin v0.11.0 on 2026-09-04 (scan of `django/http/` at the CVE-2021-28658 fix's parent). A fix commit (the
+  plugin's patch), a kept-test commit (the patch carries tests, which fail on the parent and pass on the patch), a record
+  commit, cannot-verify stated, and no sibling patches: the query listed `uploadedfile.py` only at low confidence, below
+  the verdict threshold, so it became derived finding F2.1 in the report rather than a patch.
 - **Target output:** [PR #1](https://github.com/glenfmessenger/django/pull/1), what the corrected query would produce: the same fix, then patches for the two
   sibling consumers, commits 2–3 hand-adapted from Django's later CVE-2021-31542 fix, and the record.
 
@@ -126,7 +126,7 @@ To re-run the full evaluation (API key, ~40 minutes), see [REPRODUCING.md](REPRO
 | Sampling over the 40-commit cap | working | Even sampling; labelled commits force-included; evaluated/skipped lists in every verdict of that contract. |
 | `report` / `eval` (Wilson CIs) | working | Markdown; eval scores REGRESSED detection and exact-status agreement against pre-registered labels. |
 | OpenSSH bolt-on | working, tiers 2–4 only | C preprocessor guards treated as guard lines; no build or test. |
-| Close finding / open PR (`holdfast close`) | working | Branch from the stamped revision, fix commit, kept-test commit when the patch has tests, record commit, PR on the fork via `gh`. Demonstrated on the F1 report (hand-built in the plugin's schema; the plugin did not produce it). |
+| Close finding / open PR (`holdfast close`) | working | Branch from the stamped revision, fix commit, kept-test commit when the patch has tests, record commit, PR on the fork via `gh`. Demonstrated on finding F2 of a report produced by the Claude Security plugin v0.11.0 on 2026-09-04. |
 | Propose patches for derived findings | design; not prototyped | Derived findings go back through Suggest patches; Holdfast writes no patches. |
 | Tier 5 HUMAN | not attempted | Reserved. |
 | Contract re-anchoring after a HELD verdict | not attempted | See "What I'd build next". |

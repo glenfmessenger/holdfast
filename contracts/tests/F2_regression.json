@@ -1,0 +1,16 @@
+{
+  "kind": "extracted_from_fix_commit_tests",
+  "runner": "django-runtests",
+  "source_commit": "cadf330d0fb87c141bfe7b71eacec6631ede62f1",
+  "test_files": [
+    "tests/file_uploads/tests.py"
+  ],
+  "test_ids": [
+    "file_uploads.tests.FileUploadTests.test_blank_filenames",
+    "file_uploads.tests.FileUploadTests.test_dangerous_file_names",
+    "file_uploads.tests.MultiParserTests.test_sanitize_file_name",
+    "file_uploads.tests.MultiParserTests.test_sanitize_invalid_file_name",
+    "file_uploads.tests.MultiParserTests.test_upload_handler_receives_sanitized_file_name"
+  ],
+  "python_hint": "auto"
+}

@@ -43,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--repo", required=True)
     k.add_argument("--no-model", action="store_true")
     k.add_argument("--model", default=None)
+    k.add_argument("--cap", type=int, default=None, help="override the tier-4 call cap for this run (recorded in the call log)")
 
     i = sub.add_parser("integrate", help="run Holdfast on one Claude Security finding (report dir + F<n>)")
     i.add_argument("--report", required=True, help="CLAUDE-SECURITY-<ts> directory")
@@ -50,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--repo", help="repository the report belongs to (default: parent of --report)")
     i.add_argument("--no-model", action="store_true")
     i.add_argument("--model", default=None)
+    i.add_argument("--cap", type=int, default=None, help="override the tier-4 call cap for this run (recorded in the call log)")
 
     cl = sub.add_parser("close", help="integrate, then close the finding as a PR on the fork")
     cl.add_argument("--report", required=True)
@@ -58,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     cl.add_argument("--remote", default="fork", help="git remote of the fork to push to and open the PR on")
     cl.add_argument("--no-model", action="store_true")
     cl.add_argument("--model", default=None)
+    cl.add_argument("--cap", type=int, default=None, help="override the tier-4 call cap for this run (recorded in the call log)")
 
     args = p.parse_args(argv)
     if args.cmd == "create":

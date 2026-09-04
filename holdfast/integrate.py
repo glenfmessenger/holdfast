@@ -176,7 +176,7 @@ def integrate(report: Path, fid: str, repo_path: Path | None, model: ModelClient
 
 
 def integrate_command(args) -> int:
-    model = ModelClient(args.model, disabled=args.no_model, cap=150 + EXERCISE_CAP)
+    model = ModelClient(args.model, disabled=args.no_model, cap=(args.cap or 150 + EXERCISE_CAP))
     r = integrate(Path(args.report), args.finding, Path(args.repo) if args.repo else None, model)
     print(json.dumps(r, indent=2))
     return 0
