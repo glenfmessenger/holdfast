@@ -1,0 +1,49 @@
+{
+  "_about": "Pre-registered expectations for `holdfast complete` (value-flow completeness check at the fix commit). Written before the command was implemented or run. Not adjusted afterwards.",
+  "_written": "2026-09-03",
+  "_verdicts": ["COMPLETE", "INCOMPLETE", "UNVERIFIABLE"],
+  "contracts": [
+    {
+      "contract": "CVE-2021-28658",
+      "expected": "INCOMPLETE",
+      "expected_consumers": ["django/core/files/uploadedfile.py", "django/db/models/fields/files.py"],
+      "rationale": "Multipart upload filename is sanitized in MultiPartParser only; CVE-2021-31542 four weeks later says UploadedFile and FieldFile allowed traversal via the same value. uploadedfile.py:42 still uses bare os.path.basename(name) at the fix commit.",
+      "confidence": "confident of both verdict and consumers (named in the CVE-2021-31542 release note)"
+    },
+    {
+      "contract": "CVE-2019-14232",
+      "expected": "INCOMPLETE",
+      "expected_consumers": ["django/utils/text.py (Truncator.chars/words html=True path, re_words/re_chars over unbounded input)"],
+      "rationale": "The 2023 release note for CVE-2023-43665 says the regexes revised by this fix 'still exhibited linear backtracking complexity' on very long input; the value (untrusted HTML text) still reaches the same regex without a length bound.",
+      "confidence": "confident of the verdict; the 'consumer' is the same function with an unbounded input rather than a different file, so a file-level consumer list may not express it. Recorded as a hit only if the model names the unbounded-input path or the Truncator html path."
+    },
+    {
+      "contract": "CVE-2019-14233",
+      "expected": "INCOMPLETE",
+      "expected_consumers": ["django/utils/html.py (strip_tags loop: bounded-progress deep recursion still unbounded)"],
+      "rationale": "CVE-2024-53907 has the identical description; the 2019 fix stopped the no-progress case but not deep recursion with progress, hence the 2024 depth cap.",
+      "confidence": "confident of the verdict only; the gap is algorithmic within strip_tags, not a separate consumer, so a value-flow query may not see it."
+    },
+    {
+      "contract": "CVE-2021-45452",
+      "expected": "INCOMPLETE",
+      "expected_consumers": ["django/core/files/storage.py (Storage.save -> generate_filename/get_available_name overridable hooks; validation not at save())", "subclasses overriding generate_filename, e.g. django/contrib/staticfiles/storage.py"],
+      "rationale": "CVE-2024-39330: derived classes overriding generate_filename() without replicating validation allowed traversal via save(); the 2021 fix placed validation in overridable hooks and after _save, not before get_available_name.",
+      "confidence": "confident of the verdict; moderately confident of the consumer (the override points in storage.py itself)."
+    },
+    {
+      "contract": "CVE-2019-14235",
+      "expected": "COMPLETE",
+      "expected_consumers": [],
+      "rationale": "The 2019 fix fully removed recursion from repercent_broken_unicode; CVE-2023-41164 is quadratic string rebuilding introduced by the fix itself, a different bug, and the value has no other consumer of the vulnerable pattern.",
+      "confidence": "confident of the verdict."
+    },
+    {
+      "contract": "CVE-2023-23969",
+      "expected": "COMPLETE",
+      "expected_consumers": [],
+      "rationale": "The fix caps the Accept-Language header before the lru_cache'd parser; CVE-2024-39614 concerns get_supported_language_variant fed from cookie/URL prefix, a different entry point and value.",
+      "confidence": "confident of the verdict; a strict reading could call get_supported_language_variant a consumer of a related value. Pre-registered as COMPLETE; if the model flags it, that is recorded as a false flag."
+    }
+  ]
+}

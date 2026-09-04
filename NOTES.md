@@ -122,3 +122,16 @@ Decisions and surprises, in the order they happened. For the writeup.
   with neutral wording after all walks completed so every walk ran with the same prompt.
 - `model_only` was initially defined too strictly (all evidence tier 4) and reported 0; corrected to "tier 4
   decided" before writing the README. No verdicts changed.
+
+## 2026-09-03 — completeness check (bounded addition)
+
+- `holdfast complete`: one tier-4 call per contract; context = excerpts (±12 lines) from every source file referencing
+  the fix's function names, guard symbols and value variables, ranked by reference count, cap 25. Own budget of 12
+  calls on top of the spent 150; 6 used, all logged with `purpose: complete`.
+- Pre-registered 4 INCOMPLETE / 2 COMPLETE. Result: 1 hit, 3 misses, 2 correct, 0 false flags.
+- The 28658 miss is the instructive one: the model had `uploadedfile.py:42` in front of it and called its bare
+  `os.path.basename(name)` a covering layer, because it reasoned the value only enters through MultiPartParser.
+  Widening the context found the sibling; judging it still required knowing the sibling's guard is the pre-fix
+  pattern. Not tuned after seeing the result.
+- Truncator and strip_tags misses are structural: the gap is an insufficient guard on the same path, which a
+  "which consumers lack the guard" question cannot express.

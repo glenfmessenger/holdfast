@@ -38,6 +38,12 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("--labels", required=True)
     e.add_argument("--out", default="results/eval.md")
 
+    k = sub.add_parser("complete", help="value-flow completeness check at the fix commit")
+    k.add_argument("--contract", required=True)
+    k.add_argument("--repo", required=True)
+    k.add_argument("--no-model", action="store_true")
+    k.add_argument("--model", default=None)
+
     args = p.parse_args(argv)
     if args.cmd == "create":
         from .contract import create_command
@@ -45,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "walk":
         from .walk import walk_command
         return walk_command(args)
+    if args.cmd == "complete":
+        from .complete import complete_command
+        return complete_command(args)
     if args.cmd == "report":
         from .report import report_command
         return report_command(args)

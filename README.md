@@ -63,6 +63,15 @@ predicted it would.
 3. **False resurrection rejected**, guard lines all rewritten, tier 4: `results/verdicts/CVE-2021-33571/bdf3e156b4.json`
 4. **The miss**: `results/verdicts/CVE-2022-34265/877c800f25.json`
 
+### Completeness check (value-flow query)
+
+`holdfast complete` asks, at the fix commit, whether the protected value still flows to a consumer the fix did not
+reach, with context widened to every file referencing the fix's symbols (cap 25). Pre-registered on six contracts:
+1 of 4 INCOMPLETE cases caught (CVE-2021-45452, `django/contrib/staticfiles/storage.py` calling `_save()` directly),
+both COMPLETE cases correct, no false flags. It missed CVE-2021-28658's siblings: it saw `django/core/files/uploadedfile.py`
+and judged its bare `os.path.basename` a covering "defense-in-depth layer"; `django/db/models/fields/files.py` was
+not flagged. Details: `results/completeness.md`.
+
 ## Where it breaks
 
 Root cause: the contract's scope is defined structurally (files, lines, one-hop callers) while the property lives
