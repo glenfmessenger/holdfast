@@ -249,3 +249,10 @@ README change; nothing else does.
   (`"purpose": "budget"`) are not counted as calls.
 - Committed copy: `demo_artifacts/claude-security-path-a/` (PROVENANCE.md lists what the plugin wrote and what
   Holdfast added). The hand-built path-B copy stays for the record.
+- 2026-09-04, PR #3 presentation: the fix commit's subject was amended to "Close F2: <title>" (body unchanged) and the
+  kept-test and record commits replayed on top; tree identical to the pre-amend head (`git diff --quiet` clean),
+  force-pushed. The record's `close.commits` shas (in the report dir and in the branch's `.holdfast/records/F2.json`)
+  predate the amend and identify the same diffs; they were left as record data. The PR body is rendered from the
+  record with the live branch hashes passed in, and now distinguishes the scratch commit (where evidence was gathered)
+  from the branch commit. Future `close` runs use the "Close F<n>:" subject directly. PR #2 closed as superseded by #3;
+  its branch kept.

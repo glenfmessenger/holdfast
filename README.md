@@ -182,4 +182,5 @@ common failure in this sample and the one the current scope definition cannot se
 1. **Re-anchor contracts on HELD**; today one rewrite blinds tier 2 forever.
 2. **Scope from data flow rather than call graph, with copy detection as well as rename detection.**
 3. **Separate property tests from behaviour tests.**
+4. **Define the protected value as the value class** (externally supplied filenames), not the parser's variable — parallel entry points are out of scope by construction today.
 

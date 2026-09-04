@@ -82,8 +82,8 @@ def close(report: Path, fid: str, repo_path: Path | None, model: ModelClient, re
         ident = ["-c", "user.name=Holdfast", "-c", "user.email=holdfast@localhost"]
         # 3. fix commit
         _run(["git", "-C", str(wt), "add", "--", *src_paths])
-        _run(["git", "-C", str(wt), *ident, "commit", "-q", "-m", parent["title"], "-m", f"Closes {fid}. {prov}"])
-        commits.append(("fix", _run(["git", "-C", str(wt), "rev-parse", "HEAD"]), parent["title"]))
+        _run(["git", "-C", str(wt), *ident, "commit", "-q", "-m", f"Close {fid}: {parent['title']}", "-m", f"Closes {fid}. {prov}"])
+        commits.append(("fix", _run(["git", "-C", str(wt), "rev-parse", "HEAD"]), f"Close {fid}: {parent['title']}"))
         # 4. kept test
         if test_paths:
             _run(["git", "-C", str(wt), "add", "--", *test_paths])
@@ -122,18 +122,24 @@ def close(report: Path, fid: str, repo_path: Path | None, model: ModelClient, re
             "commits": record["close"]["commits"], "kept_test": kept_test, "pr_url": url}
 
 
-def render_pr_body(record: dict, title: str, fid: str) -> str:
+def render_pr_body(record: dict, title: str, fid: str, commits: list[dict] | None = None) -> str:
     """PR body from the record. The user-facing completeness text never says COMPLETE: it lists what was
     examined and then what cannot be verified. The internal verdict enum stays in the record JSON."""
     cl = record["close"]
     k = record["completeness"]
     kept = record["kept_test"]
     derived = record.get("derived_findings") or []
-    commits = cl["commits"]
+    commits = commits or cl["commits"]
     fix = next(c for c in commits if c["role"] == "fix")
     rec = next(c for c in commits if c["role"] == "record")
     kept_c = next((c for c in commits if c["role"] == "kept test"), None)
-    ev = "\n".join(f"  - tier {e['tier']} {e['kind']}: {e['detail']}" for e in record["evidence_by_tier"])
+    scratch = (record.get("scratch_commit") or "")[:10]
+    rev = cl["base_commit"][:10]
+    where = f"scratch commit {scratch} (the patch applied at {rev}); branch commit {fix['sha'][:10]}"
+    def cite(detail: str) -> str:
+        # tier-1 text says "PASS on fix <scratch>"; make the scratch/branch distinction explicit
+        return detail.replace(f"on fix {scratch}", f"on {where}").replace(scratch, f"scratch commit {scratch}") if scratch else detail
+    ev = "\n".join(f"  - tier {e['tier']} {e['kind']}: {cite(e['detail'])}" for e in record["evidence_by_tier"])
     examined = k.get("covered") or []
     ex_lines = "\n".join(f"- `{c.get('function')}` in `{c.get('file')}` — {c.get('reason', '')}" for c in examined) or "- (none listed)"
     kept_line = (f"commit `{kept_c['sha'][:10]}`, paths {', '.join(kept['paths'])}" if kept.get("paths") and kept_c
@@ -155,7 +161,7 @@ def render_pr_body(record: dict, title: str, fid: str) -> str:
 
 ## Evidence by tier, per commit
 
-- **Fix commit** `{fix['sha'][:10]}` — {title} (evidence gathered on the patch applied at {cl['base_commit'][:10]}):
+- **Fix commit** `{fix['sha'][:10]}` — {fix.get('subject', title)} (evidence gathered on {where}):
 {ev}
 - **Kept test:** {kept_line}
 - **Record commit** `{rec['sha'][:10]}` — `.holdfast/records/{fid}.json`
