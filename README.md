@@ -2,18 +2,21 @@
 
 ## What Holdfast does
 
-A security scanner verifies a fix once, when the fix is written, and that evidence is lost at merge. Holdfast creates a
-durable remediation record for each fix: the security property the fix establishes, the evidence for it labelled by
-tier (executed test, guard structure, rule, model judgement), the scope the property depends on, and what the record
-cannot verify. It keeps the fix's own test and re-runs it on relevant changes; re-verification of the property itself across
-refactoring is the six-month direction, not a v1 claim. At merge, it asks whether the value the fix protects still flows
-to a consumer the fix did not reach. The design stance: evidence is labelled by tier and never blended, and the tool
-says UNVERIFIABLE rather than guessing.
+Holdfast is a merge-time completeness check plus an evidence-tiered remediation record, inside Claude Security: the
+completeness and durability layer on top of Claude Security's remediation. It is for AppSec and engineering teams
+already merging Claude-generated patches. It hooks into the plugin's fix job after the patch-verifier agent and before
+the patch file is written: it asks whether the value the fix protects still flows to a consumer the fix did not reach,
+and it writes a record of the property, the evidence by tier, and what could not be verified.
+
+The finding behind it: fixes are rarely undone and often incomplete. Of 20 fixes studied, 5 were revisited by a later
+CVE in the same function; none silently regressed in the walked, sampled history. The v1 stance is low recall and zero
+false flags, UNVERIFIABLE over guessing, evidence never blended. Continuous re-verification of the property across
+refactoring is the six-month direction; the walk below is the experiment that showed why.
 
 ## What the prototype found
 
 Fixes were rarely undone and often incomplete at merge. Continuous re-verification is not ready: 1 real regression in
-23 flagged, with one root cause (scope defined structurally while the property lives semantically), see
+23 flagged: one wall (scope defined structurally while the property lives semantically) and three bugs left untuned, see
 [results/eval.md](results/eval.md). The completeness check is precise and low-recall on a small pre-registered set:
 1 hit, 3 misses and 0 false flags on 6 contracts, see [results/completeness.md](results/completeness.md).
 
@@ -66,8 +69,8 @@ git -C .targets/openssh-portable checkout 752250caab           # the regressing 
 ```
 
 or run `./demo` and let it clone them on first run: if `.targets/` is missing it prints what it is cloning and why
-(full history is needed for the walks), clones both, checks out the commits above, and continues. Expect a few
-minutes and roughly 400 MB the first time.
+(full history is needed for the walks), clones both, checks out the commits above, and continues. The first-run
+clone takes about 30 seconds and 400 MB (measured: 20 s, 412 MB); the replay itself takes about 8 seconds.
 
 ## What's real vs stubbed
 
@@ -94,10 +97,9 @@ Across all 392 verdicts, 1 of 23 REGRESSED is a real regression (OpenSSH); the o
 21 contracts, 150 tier-4 calls (cap hit; 8 UNVERIFIABLE "budget"). 356 HELD, 23 REGRESSED, 1 MOVED, 12 UNVERIFIABLE;
 deciding tier 134 / 127 / 8 / 123. **HELD decided by tier 4 alone: 108 of 356.** Tables: `results/report.md`, `results/eval.md`.
 
-Labelled eval, 25 pairs pre-registered before any walk (24 walked): REGRESSED precision 1/1, recall 1/1,
-Wilson 95% [0.21, 1.00]; exact-status agreement 20/24 = 0.83 [0.64, 0.93]; 9/24 model-only. n is tiny; the
-interval says so. All 22 false REGRESSED occurred on unlabelled pairs: the matcher failed where nobody had
-predicted it would.
+Labelled eval, 25 pairs pre-registered before any walk (24 walked): exact-status agreement 20/24 = 0.83
+[Wilson 95%: 0.64, 0.93]; 9/24 model-only. n is tiny; the interval says so. All 22 false REGRESSED occurred on
+unlabelled pairs: the matcher failed where nobody had predicted it would.
 
 1. **Held through a real refactor**, tier 1: `results/verdicts/CVE-2021-28658/34e2148fc7.json`
 2. **Regression caught**, OpenSSH, tier 4: `results/verdicts/CVE-2006-5051/752250caab.json`
@@ -116,13 +118,19 @@ not flagged. Details: `results/completeness.md`.
 ## Where it breaks
 
 Root cause: the contract's scope is defined structurally (files, lines, one-hop callers) while the property lives
-semantically (data flow, architecture). Failure modes by tier:
+semantically (data flow, architecture). The 22 false REGRESSED split into one wall and three bugs left untuned:
 
-- **Tier 1, test drift and property/behaviour mismatch.** CVE-2019-14232, 2 × REGRESSED: Truncator rewritten on HTMLParser; the test fails on ellipsis placement, not the DoS property. CVE-2020-24583, 3 × REGRESSED: the frozen 2020 test asserts a file mode Django later changed on purpose. Three relocations called HELD rather than MOVED because the test still passed.
-- **Tier 3, line-level rule.** CVE-2019-12308, 8 × REGRESSED: the deleted line `def __init__(self, attrs=None):` reappeared in an unrelated new class.
-- **Tier 4, scope blindness.** The miss: `877c800f25` replaced the CVE-2022-34265 whitelist with parameterized SQL in each backend. The model saw only the scope-file diff (whitelist deleted) and said REGRESSED, high confidence, nine commits running. Also CVE-2019-14232, 4 × UNVERIFIABLE: module-level constants have no function to show.
-- **Coverage.** CVE-2021-45452 at `fe4a0bbe20` never visited: `storage/base.py` was born by copy, not rename.
-- **Sibling check.** 3 of 4 pre-registered INCOMPLETE_AT_MERGE cases missed (sibling consumers are not callers); the one hit flagged the wrong regex.
+**(a) The wall: model scope-blindness (9).** `877c800f25` replaced the CVE-2022-34265 whitelist with parameterized SQL
+in each backend. The model saw only the scope-file diff (whitelist deleted) and said REGRESSED, high confidence, nine
+commits running. Also CVE-2019-14232, 4 × UNVERIFIABLE: module-level constants have no function to show.
+
+**(b) Untuned mechanics, left in deliberately (13).**
+- **Tier 3, line-level rule (8).** CVE-2019-12308: the deleted line `def __init__(self, attrs=None):` reappeared in an unrelated new class.
+- **Tier 1, frozen-test drift and property/behaviour mismatch (5).** CVE-2019-14232, 2 × REGRESSED: Truncator rewritten on HTMLParser; the test fails on ellipsis placement, not the DoS property. CVE-2020-24583, 3 × REGRESSED: the frozen 2020 test asserts a file mode Django later changed on purpose. Three relocations called HELD rather than MOVED because the test still passed.
+- **Coverage, copy-not-rename.** CVE-2021-45452 at `fe4a0bbe20` never visited: `storage/base.py` was born by copy, not rename.
+
+Outside the 22: the sibling check missed 3 of 4 pre-registered INCOMPLETE_AT_MERGE cases (sibling consumers are not
+callers); the one hit flagged the wrong regex.
 
 Base rate: across 20 Django fixes, no silent regression of a correct fix was observed in the walked history; the one
 real REGRESSED is OpenSSH. Five of the 20 Django fixes were revisited by a later CVE in the same function; at contract

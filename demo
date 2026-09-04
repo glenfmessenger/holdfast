@@ -154,14 +154,17 @@ def main():
         t1 = next(e for e in c.evidence_at_creation if e.tier == 1)
         print(f"  create: property: {c.property[:110]}...\n          tier 1: {t1.detail[:110]}")
         repo = Repo(Path(repo_path))
+        if ("complete", cid, c.fix_commit) in model.index:
+            k = complete_contract(c, repo, model)
+            (OUT / "completeness" / f"{cid}.json").write_text(json.dumps(k, indent=2) + "\n")
+            print(f"  complete: {k['verdict']} | uncovered: {[(u.get('file'), u.get('confidence')) for u in k['uncovered']]}")
+        else:
+            print("  complete: not run live — see walk verdict below")
         print(f"  walk {rng}:")
         vs = walk_contract(c, repo, rng, 40, model, None, include, run_tests=True, out_dir=OUT / "verdicts")
-        k = complete_contract(c, repo, model)
-        (OUT / "completeness" / f"{cid}.json").write_text(json.dumps(k, indent=2) + "\n")
-        print(f"  complete: {k['verdict']} | uncovered: {[(u.get('file'), u.get('confidence')) for u in k['uncovered']]}")
 
     vs = load_all_verdicts(OUT / "verdicts")
-    (OUT / "report.md").write_text(render_report(vs, Path("results/showcase.json")))
+    (OUT / "report.md").write_text(render_report(vs, None, source="demo_out/ (replay of three contracts)"))
     print(f"\nreport: demo_out/report.md ({len(vs)} verdicts). Not recorded: {len(model.missing)}. "
           f"Elapsed {time.time()-t0:.1f}s. Nothing under results/ was modified.")
     return 0

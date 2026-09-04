@@ -10,12 +10,12 @@ from .models import load_all_verdicts, Tier
 SHOWCASE = Path("results/showcase.json")  # hand-written pointers to the four showcase cases
 
 
-def render_report(vs, showcase_path: Path = SHOWCASE) -> str:
+def render_report(vs, showcase_path: Path | None = SHOWCASE, source: str = "results/verdicts/") -> str:
     by_c: dict[str, list] = {}
     for v in vs:
         by_c.setdefault(v.contract_id, []).append(v)
     out = ["# Holdfast report", ""]
-    out.append(f"{len(vs)} verdicts across {len(by_c)} contracts. Generated from `results/verdicts/`.")
+    out.append(f"{len(vs)} verdicts across {len(by_c)} contracts. Generated from `{source}`.")
     out.append("")
     # counts
     st = Counter(v.status for v in vs)
