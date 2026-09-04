@@ -75,3 +75,50 @@ Decisions and surprises, in the order they happened. For the writeup.
   validation bypass, `django/forms/widgets.py`). CVE-2020-7471 left out: its tests need PostgreSQL.
 - Budget priority: contract property derivation (tier 4 at create) comes before walk verdicts. If the 150-call
   cap gets tight, walks go UNVERIFIABLE ("budget"), not contracts.
+
+## 2026-09-03 — walks
+
+- **Tier-1 acceptance rule** (set at create time, before any walk): the extracted test must NOT pass on the parent
+  (assertion failure, or an error such as AttributeError on a symbol the fix introduces) and MUST pass on the fix.
+  Parent outcome kind is recorded in the evidence. 13/20 Django contracts kept an executable test; the other 7 are
+  recorded as discarded with the reason (test file errors on the fix commit when run as a subset, or the extracted
+  ids don't discriminate). Not investigated further: a labelled stub beats a rabbit hole.
+- **Sonnet 5 + max_tokens.** With `max_tokens=4000` the model's adaptive thinking consumed the whole budget and
+  returned empty text (`stop_reason: max_tokens`) -> "unparseable" verdict. Raised to 16000. One call wasted; it is
+  in `results/model_calls.jsonl` like every other call.
+- **Once a guard line is rewritten, the structural tier is blind for the rest of the walk.** CVE-2021-31542
+  (`0b79eb3691`) rewrote 2 of CVE-2021-28658's 6 guard lines while strengthening the property. Tier 1 handled that
+  commit (the extracted test still passes), but from then on tier 2 permanently reports "4/6 present", and once the
+  frozen 2021 test file stops importing (June 2022, `parse_header` removed) every later commit needs tier 4.
+  This is the cost of a contract that never re-anchors. Deliberately NOT changed mid-run (it would be a design
+  change: contracts would need to evolve after a HELD verdict). Listed under "what I'd build next".
+- The model's property for CVE-2021-28658 pins `os.path.basename()` as "the final step". Three weeks later Django
+  replaced it with `rsplit`. The model at walk time judged the rewrite HELD anyway ("a rewrite of the sanitization
+  guard ... that preserves the same guarantee, not a removal of it"). Property statements are over-specific by
+  default; the walk-time judgement compensated here, but it is compensation, not correctness.
+- **OpenSSH regreSSHion: caught.** `752250caab` -> REGRESSED, tier 4, high confidence. Tier 2 saw 5/6 guard lines
+  (the `#ifdef DO_LOG_SAFE_IN_SIGHAND` in log.c gone, defines.h lines intact) and looked for the missing line
+  elsewhere: not found, so no MOVED hypothesis. Tier 4's rationale names the rename explicitly. 88 commits touched
+  scope (defines.h is noisy), 40 evaluated by even sampling with the regressing commit force-included.
+- Eval labels: 25 pairs. Seven are the same Black reformat commit across seven contracts — deliberately
+  over-represented to test one failure mode (quote style) seven times. Stated in labels.json and the README.
+
+## 2026-09-03 — results
+
+- Budget hit exactly 150. Last 8 commits of CVE-2022-34265 are UNVERIFIABLE "budget"; CVE-2023-31047 (walked
+  after) needed no tier 4.
+- 23 REGRESSED verdicts, 1 true (OpenSSH). The 22 false ones come from four causes, each documented in the README.
+  The worst is CVE-2022-34265 @ 877c800f25: Django swapped the whitelist for parameterized SQL in the backends;
+  the model saw only the scope-file diff and said REGRESSED (high) nine times. Not fixed.
+- CVE-2019-12308's tier-3 false alarms: the only deleted line was `def __init__(self, attrs=None):`. A single
+  generic signature line is a terrible resurrection rule input. Left as-is per the no-tuning rule.
+- CVE-2021-45452 @ fe4a0bbe20 was never visited: `storage/base.py` came out of the split as a copy, not a rename.
+  The walk collects commits from the rename graph upfront; self-healing scope only adds files where guard lines
+  are found, and only after the fact.
+- CVE-2021-33571 @ 3bbe22dafc: model said MOVED because the manual leading-zero check was dropped when Django
+  dropped Python 3.9 (the stdlib now rejects it). Reasonable, unlabelled, and interesting: the property moved to
+  the platform.
+- The banned-word instruction in the two prompts was itself the only occurrence of the words in the repo; replaced
+  with neutral wording after all walks completed so every walk ran with the same prompt.
+- `model_only` was initially defined too strictly (all evidence tier 4) and reported 0; corrected to "tier 4
+  decided" before writing the README. No verdicts changed.

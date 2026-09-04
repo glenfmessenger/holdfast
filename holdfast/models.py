@@ -108,8 +108,8 @@ class Verdict:
 
     @property
     def model_only(self) -> bool:
-        return self.tier == Tier.MODEL and all(e.tier == Tier.MODEL for e in self.evidence
-                                                if e.kind != "skipped")
+        """True when tier 4 decided: tiers 1-3 ran (or were skipped) without producing a verdict."""
+        return self.tier == Tier.MODEL
 
     def save(self, directory: Path = VERDICTS_DIR) -> Path:
         d = directory / self.contract_id

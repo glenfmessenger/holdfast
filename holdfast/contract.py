@@ -31,7 +31,7 @@ Reply with ONE JSON object and nothing else, with these keys:
   elsewhere in scope at fix time, and did this fix cover them? null if you cannot tell.
   Base this ONLY on the grep hits and diff provided; do not speculate about code you were not shown.
 - "uncertainty": 1-3 sentences on what this contract cannot verify about the property.
-Do not use the words "proof" or "fingerprint"."""
+Describe what you saw as evidence; do not claim certainty beyond it."""
 
 
 def _source_diff(repo: Repo, fix: str) -> tuple[str, list[str]]:

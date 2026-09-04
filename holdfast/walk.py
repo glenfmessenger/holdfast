@@ -37,7 +37,7 @@ Decide whether the property still holds AT THIS COMMIT. Reply with ONE JSON obje
 - "confidence_reason": one sentence.
 Judge the INVARIANT, not the literal lines: a rename or rewrite that preserves the guarantee
 is HELD or MOVED, not REGRESSED. A rename that also drops the guarantee is REGRESSED.
-Do not use the words "proof" or "fingerprint"."""
+Describe what you saw as evidence; do not claim certainty beyond it."""
 
 DISTINCTIVE_MIN = 14
 GENERIC_LINES = {"#endif", "#else", "return", "break", "continue", "pass", "va_end(args);", "va_start(args, fmt);"}
