@@ -3,8 +3,8 @@
 ## What it does
 
 Holdfast turns a security fix into a **remediation contract**: a durable record of the property the fix establishes,
-with tiered evidence and a scope of files and functions. It walks every later commit touching that scope and re-verifies
-the property, emitting a verdict per fix per commit: HELD, REGRESSED, INCOMPLETE_AT_MERGE, MOVED or UNVERIFIABLE.
+with tiered evidence and a scope. It walks every later commit touching that scope and re-verifies the property,
+emitting a verdict per fix per commit: HELD, REGRESSED, INCOMPLETE_AT_MERGE, MOVED or UNVERIFIABLE.
 Evidence tiers are never blended: executed test (1), guard-line presence (2), resurrection rule (3), model judgement (4).
 Run on 20 Django CVE fixes (2019–2023) and the OpenSSH 2006 fix whose 2020 regression became CVE-2024-6387.
 
@@ -27,7 +27,7 @@ export ANTHROPIC_API_KEY=sk-ant-...        # tier 4. Without it: tier 4 is recor
 ./scripts/create_all.sh && ./scripts/walk_all.sh       # everything in contracts/targets.json
 ```
 
-`--model` overrides `claude-sonnet-5`. Tier 4 is capped at 150 calls per run, each logged to `results/model_calls.jsonl`; past the cap, verdicts needing it are UNVERIFIABLE ("budget"). Walks stay inside `--range`, visit only scope-touching commits (renames followed), run only the fix's own test ids, and sample evenly above 40 commits.
+`--model` overrides `claude-sonnet-5`. Tier 4 is capped at 150 calls per run, each logged to `results/model_calls.jsonl`; past the cap, verdicts needing it are UNVERIFIABLE ("budget"). Walks stay inside `--range`, visit only scope-touching commits, and sample evenly above 40.
 
 ## What's real vs stubbed
 
@@ -54,8 +54,8 @@ export ANTHROPIC_API_KEY=sk-ant-...        # tier 4. Without it: tier 4 is recor
 12 UNVERIFIABLE; deciding tier 134 / 127 / 8 / 123. **HELD model-only: 108 of 356.** Tables: `results/report.md`, `results/eval.md`.
 
 Eval, 25 pre-registered pairs (24 walked): REGRESSED precision 1/1, recall 1/1, Wilson 95% [0.21, 1.00];
-exact-status agreement 20/24 = 0.83 [0.64, 0.93]; 9/24 model-only. n is tiny and the interval says so.
-Across all verdicts, 1 of 23 REGRESSED is real.
+exact-status agreement 20/24 = 0.83 [0.64, 0.93]; 9/24 model-only. n is tiny; the interval says so. Across all
+verdicts, 1 of 23 REGRESSED is real.
 
 1. **Held through a real refactor**, tier 1: `results/verdicts/CVE-2021-28658/34e2148fc7.json`
 2. **Regression caught**, OpenSSH, tier 4, rename named in the rationale: `results/verdicts/CVE-2006-5051/752250caab.json`
@@ -66,19 +66,18 @@ Across all verdicts, 1 of 23 REGRESSED is real.
 
 **The miss.** `877c800f25` replaced the CVE-2022-34265 whitelist with parameterized SQL in each backend. The model saw
 only the scope-file diff (whitelist deleted) and said REGRESSED, high confidence, nine commits running. The property
-survived by a different mechanism in different files. That is the "not possible yet": a security property is
-continuous across a codebase's evolution in ways neither guard lines nor a scope-restricted diff can follow.
+survived by a different mechanism in different files. That is the "not possible yet": a property stays continuous across evolution in ways neither guard lines nor a scoped diff can follow.
 
 Every other wrong verdict:
 - CVE-2019-12308, 8 × REGRESSED (tier 3): the deleted line `def __init__(self, attrs=None):` reappeared in an unrelated new class.
-- CVE-2019-14232, 2 × REGRESSED (tier 1): Truncator rewritten on HTMLParser; the test fails on ellipsis placement, not the DoS property. Plus 4 × UNVERIFIABLE: module-level constants, no function to show.
+- CVE-2019-14232, 2 × REGRESSED (tier 1): Truncator rewritten on HTMLParser; the test fails on ellipsis placement, not the DoS property. Plus 4 × UNVERIFIABLE: constants have no function to show.
 - CVE-2020-24583, 3 × REGRESSED (tier 1): frozen 2020 test asserts a file mode Django later changed; Django's own test passes there.
 - CVE-2021-45452 at `fe4a0bbe20`: never visited; `storage/base.py` was born by copy, not rename.
 - Sibling check: 3 of 4 pre-registered INCOMPLETE_AT_MERGE cases missed (sibling consumers are not callers). The one hit flagged the wrong regex.
-- Three relocations called HELD at tier 1 rather than MOVED: no alarm, but the contract never learned where its code went.
+- Three relocations called HELD at tier 1 rather than MOVED; no alarm, but the contract never learned where its code went.
 
 ## What I'd build next
 
-1. **Re-anchor contracts on HELD**: re-derive guard lines and scope after a confirmed HELD with changed lines. Today one rewrite blinds tier 2 forever.
+1. **Re-anchor contracts on HELD**: re-derive guard lines and scope after a confirmed HELD with changed lines; today one rewrite blinds tier 2 forever.
 2. **Scope by data flow, not call graph**: follow the untrusted value to every consumer and mechanism move. Covers the miss and the sibling gap.
 3. **Separate property tests from behaviour tests**: extract only assertions exercising the advisory's input class.
