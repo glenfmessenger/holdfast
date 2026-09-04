@@ -147,12 +147,14 @@ def create_contract(repo_path: str, fix: str, advisory: str, advisory_text: str 
         on_parent = testrun.run_spec(repo, parent, spec)
         on_fix = testrun.run_spec(repo, fix_full, spec)
         detail = {"spec": asdict(spec), "parent": asdict(on_parent), "fix": asdict(on_fix)}
-        if on_parent.outcome == "fail" and on_fix.outcome == "pass":
+        # Acceptance rule: the test must NOT pass on the parent (fail, or error such as AttributeError
+        # on a symbol the fix introduces) and MUST pass on the fix. The parent outcome kind is recorded.
+        if on_parent.outcome in ("fail", "error") and on_fix.outcome == "pass":
             TESTS_DIR.mkdir(parents=True, exist_ok=True)
             reg_path = str(TESTS_DIR / f"{advisory}_regression.json")
             Path(reg_path).write_text(json.dumps(asdict(spec), indent=2) + "\n")
             evidence.append(Evidence(Tier.EXECUTED, "regression_test",
-                                     f"extracted test(s) {spec.test_ids}: FAIL on parent {parent[:10]} "
+                                     f"extracted test(s) {spec.test_ids}: {on_parent.outcome.upper()} on parent {parent[:10]} "
                                      f"({on_parent.summary}), PASS on fix {fix_full[:10]}.", detail))
         else:
             reg_reason = (f"extracted test did not behave as a regression test: parent={on_parent.outcome} "

@@ -56,7 +56,7 @@ class ModelClient:
 
     # -- calling ------------------------------------------------------------
     def call(self, purpose: str, contract: str, commit: str, system: str, user: str,
-             max_tokens: int = 4000) -> dict | None:
+             max_tokens: int = 16000) -> dict | None:
         """Returns {"parsed": dict|None, "text": str, "usage": {...}} or None if unavailable."""
         if not self.available:
             return None
@@ -95,7 +95,9 @@ def extract_json(text: str) -> dict | None:
         if start == -1 or end == -1:
             return None
         cand = text[start:end + 1]
-    try:
-        return json.loads(cand)
-    except json.JSONDecodeError:
-        return None
+    for attempt in (cand, re.sub(r'\\(?![\\"/bfnrtu])', r"\\\\", cand)):
+        try:
+            return json.loads(attempt, strict=False)
+        except json.JSONDecodeError:
+            continue
+    return None

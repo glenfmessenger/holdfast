@@ -50,7 +50,7 @@ class Repo:
 
     def log_range(self, rng: str, *paths: str, follow_renames: bool = True) -> list[tuple[str, str, str]]:
         """Commits in `rng` touching `paths`, oldest first: (hash, date, subject)."""
-        args = ["log", "--reverse", "--format=%H%x1f%ad%x1f%s", "--date=short", rng]
+        args = ["log", "--reverse", "--format=%H%x1f%cd%x1f%s", "--date=short", rng]
         if paths:
             args += ["--", *paths]
         out = []

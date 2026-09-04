@@ -62,3 +62,16 @@ Decisions and surprises, in the order they happened. For the writeup.
 - CVE-2021-31542 also *rewrites* two of this contract's six guard lines (rfind/basename ->
   rsplit) while strengthening the property. Pre-registered as a false-resurrection trap:
   expected HELD, a REGRESSED verdict there is a miss.
+
+## Scope definition
+
+- The one-hop caller rule misses sibling consumers of the same untrusted value (e.g. `UploadedFile._set_name`
+  for CVE-2021-28658), because security properties propagate along data flow rather than the call graph.
+  Kept as-is deliberately; this is a core "not possible yet" finding.
+
+## Final target set (confirmed 2026-09-03)
+
+- Swap approved: #1 CVE-2019-6975 (numberformat) replaced by CVE-2023-31047 (`fb4c55d9ec`, multiple-file-upload
+  validation bypass, `django/forms/widgets.py`). CVE-2020-7471 left out: its tests need PostgreSQL.
+- Budget priority: contract property derivation (tier 4 at create) comes before walk verdicts. If the 150-call
+  cap gets tight, walks go UNVERIFIABLE ("budget"), not contracts.

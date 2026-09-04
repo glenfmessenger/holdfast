@@ -29,7 +29,7 @@ class Hunk:
 
 
 def is_source(path: str) -> bool:
-    if any(m in path for m in DOC_MARKERS):
+    if path.startswith("docs/") or "/docs/" in path or path.endswith((".txt", ".rst", ".md")) or "ChangeLog" in path:
         return False
     if path.startswith("tests/") or "/tests/" in path or "/test/" in path:
         return False

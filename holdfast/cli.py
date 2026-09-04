@@ -28,6 +28,8 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--no-model", action="store_true")
     w.add_argument("--model", default=None)
     w.add_argument("--only", help="comma-separated commit prefixes to evaluate (for eval pairs)")
+    w.add_argument("--include", help="comma-separated commit prefixes that sampling must keep (labelled commits)")
+    w.add_argument("--no-tests", action="store_true", help="skip tier-1 execution")
 
     r = sub.add_parser("report", help="Markdown summary of all verdicts")
     r.add_argument("--out", default="results/report.md")

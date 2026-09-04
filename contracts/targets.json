@@ -1,0 +1,36 @@
+{
+  "_about": "Confirmed target set. Django walk range ends at 8d9901c961 (2024-12-27). OpenSSH range is bb59814cd6..752250caab (the regressing commit is the last commit evaluated).",
+  "django": {
+    "repo": ".targets/django",
+    "walk_end": "8d9901c961",
+    "contracts": [
+      {"advisory": "CVE-2023-31047", "fix": "fb4c55d9ec", "note": "swapped in for CVE-2019-6975"},
+      {"advisory": "CVE-2019-12308", "fix": "deeba6d920"},
+      {"advisory": "CVE-2019-12781", "fix": "54d0f5e62f"},
+      {"advisory": "CVE-2019-14232", "fix": "7f65974f82"},
+      {"advisory": "CVE-2019-14233", "fix": "4b78420d25"},
+      {"advisory": "CVE-2019-14235", "fix": "76ed1c49f8"},
+      {"advisory": "CVE-2019-19118", "fix": "11c5e0609b", "note": "over cap; sampled"},
+      {"advisory": "CVE-2019-19844", "fix": "5b1fbcef7a"},
+      {"advisory": "CVE-2020-13596", "fix": "2dd4d110c1"},
+      {"advisory": "CVE-2020-24583", "fix": "8d7271578d", "note": "file renamed 2022"},
+      {"advisory": "CVE-2021-28658", "fix": "d4d800ca1a"},
+      {"advisory": "CVE-2021-33203", "fix": "46572de2e9"},
+      {"advisory": "CVE-2021-33571", "fix": "e1d787f1b3"},
+      {"advisory": "CVE-2021-45116", "fix": "761f449e0d"},
+      {"advisory": "CVE-2021-45452", "fix": "6d343d01c5", "note": "file renamed 2022"},
+      {"advisory": "CVE-2022-22818", "fix": "394517f078"},
+      {"advisory": "CVE-2022-28346", "fix": "93cae5cb2f", "note": "over cap; sampled"},
+      {"advisory": "CVE-2022-34265", "fix": "54eb8a374d"},
+      {"advisory": "CVE-2022-36359", "fix": "bd062445cf"},
+      {"advisory": "CVE-2023-23969", "fix": "8c660fb592"}
+    ]
+  },
+  "openssh": {
+    "repo": ".targets/openssh-portable",
+    "contracts": [
+      {"advisory": "CVE-2006-5051", "fix": "bb59814cd6", "walk_range": "bb59814cd6..752250caab",
+       "advisory_text": "contracts/advisories/CVE-2006-5051.txt", "note": "tiers 2-4 only; no build/test"}
+    ]
+  }
+}
