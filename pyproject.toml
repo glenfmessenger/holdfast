@@ -1,0 +1,22 @@
+[project]
+name = "holdfast"
+version = "0.1.0"
+description = "Remediation contracts: durable, re-verified records of the security property a fix establishes."
+requires-python = ">=3.11"
+dependencies = ["anthropic>=0.40"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+holdfast = "holdfast.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["holdfast*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
