@@ -10,8 +10,7 @@ from .models import load_all_verdicts, Tier
 SHOWCASE = Path("results/showcase.json")  # hand-written pointers to the four showcase cases
 
 
-def report_command(args) -> int:
-    vs = load_all_verdicts()
+def render_report(vs, showcase_path: Path = SHOWCASE) -> str:
     by_c: dict[str, list] = {}
     for v in vs:
         by_c.setdefault(v.contract_id, []).append(v)
@@ -37,8 +36,8 @@ def report_command(args) -> int:
     dis = [v for v in vs if v.tier_disagreement]
     out.append(f"Tier disagreements recorded (model vs tiers 1-3): {len(dis)}.")
     out.append("")
-    if SHOWCASE.exists():
-        sc = json.loads(SHOWCASE.read_text())
+    if showcase_path and showcase_path.exists():
+        sc = json.loads(showcase_path.read_text())
         out.append("## Showcase cases")
         out.append("")
         for k, item in sc.items():
@@ -61,7 +60,12 @@ def report_command(args) -> int:
             flag = " ⚠" if v.tier_disagreement else ""
             out.append(f"| {v.commit_date} | `{v.commit[:10]}` | {v.status}{flag} | {v.tier} | {v.confidence} | {v.commit_subject[:70].replace('|', '/')} |")
         out.append("")
+    return "\n".join(out) + "\n"
+
+
+def report_command(args) -> int:
+    vs = load_all_verdicts()
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text("\n".join(out) + "\n")
-    print(f"wrote {args.out}: {len(vs)} verdicts, {len(by_c)} contracts")
+    Path(args.out).write_text(render_report(vs))
+    print(f"wrote {args.out}: {len(vs)} verdicts, {len({v.contract_id for v in vs})} contracts")
     return 0

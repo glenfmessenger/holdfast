@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+"""One-command replay of the three showcase contracts: create -> walk -> complete -> report.
+
+Model responses are replayed from the recorded run (results/), keyed by (purpose, contract, commit);
+tier-1 test outcomes are replayed from the recorded verdicts for the same reason (a live run takes
+~40 minutes). No API key is used. If a response is not in the recording, the verdict is
+UNVERIFIABLE (not recorded) -- the API is never called. Nothing under results/ is modified;
+everything is written to demo_out/.
+Requires the target clones in .targets/ (see README, "Reproduce from scratch").
+"""
+import json, os, sys, time
+from dataclasses import asdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+os.chdir(ROOT)
+sys.path.insert(0, str(ROOT))
+
+import holdfast.testrun as testrun
+import holdfast.contract as contract_mod
+from holdfast.contract import create_contract
+from holdfast.walk import walk_contract
+from holdfast.complete import complete_contract
+from holdfast.report import render_report
+from holdfast.model import ModelClient, extract_json
+from holdfast.models import load_all_verdicts
+from holdfast.gitutil import Repo
+
+OUT = ROOT / "demo_out"
+CASES = [  # (contract, repo, fix, advisory_text, walk range, include)
+    ("CVE-2021-28658", ".targets/django", "d4d800ca1a", None, "d4d800ca1a..8d9901c961", set()),
+    ("CVE-2021-45452", ".targets/django", "6d343d01c5", None, "6d343d01c5..8d9901c961", {"032c09c414", "fe4a0bbe20"}),
+    ("CVE-2006-5051", ".targets/openssh-portable", "bb59814cd6", "contracts/advisories/CVE-2006-5051.txt",
+     "bb59814cd6..752250caab", {"752250caab"}),
+]
+
+
+# ----------------------------------------------------------------- recording index (read-only)
+def build_index():
+    model, tests = {}, {}
+    for p in Path("contracts").glob("CVE-*.json"):
+        c = json.loads(p.read_text())
+        for e in c["evidence_at_creation"]:
+            if e["tier"] == 4 and e["data"].get("model_reply_verbatim"):
+                model[("create", c["id"], c["fix_commit"])] = e["data"]["model_reply_verbatim"]
+            if e["tier"] == 1 and "parent" in e.get("data", {}):
+                tests[(c["id"], c["parent_commit"])] = e["data"]["parent"]
+                tests[(c["id"], c["fix_commit"])] = e["data"]["fix"]
+    for p in Path("results/verdicts").glob("*/*.json"):
+        v = json.loads(p.read_text())
+        for e in v["evidence"]:
+            if e["tier"] == 4 and e["data"].get("model_reply_verbatim"):
+                model[("walk", v["contract_id"], v["commit"])] = e["data"]["model_reply_verbatim"]
+            if e["tier"] == 1 and e["kind"] == "regression_test" and ":" in e["detail"] and not e["detail"].startswith("skipped"):
+                outcome, _, summary = e["detail"].partition(": ")
+                tests[(v["contract_id"], v["commit"])] = {"outcome": outcome, "summary": summary,
+                                                          "tail": e["data"].get("tail", ""), "python": e["data"].get("python", "")}
+    for p in Path("results/completeness").glob("*.json"):
+        k = json.loads(p.read_text())
+        if k.get("model_reply_verbatim"):
+            model[("complete", k["contract"], k["fix_commit"])] = k["model_reply_verbatim"]
+    return model, tests
+
+
+def recorded_date():
+    first = Path("results/model_calls.jsonl").read_text().splitlines()[0]
+    return json.loads(first)["ts"][:10]
+
+
+class ReplayModelClient(ModelClient):
+    def __init__(self, index, log_path):
+        self.model = "replay"
+        self.log_path = log_path
+        self.cap = 10**9
+        self.reason_disabled = None
+        self._client = object()  # never used
+        self.index = index
+        self.missing = []
+
+    @property
+    def available(self):
+        return True
+
+    def unavailable_reason(self):
+        return "not recorded"
+
+    def call(self, purpose, contract, commit, system, user, max_tokens=16000):
+        text = self.index.get((purpose, contract, commit))
+        if text is None:
+            self.missing.append((purpose, contract, commit[:10]))
+            print(f"    [tier 4] {purpose} {contract} {commit[:10]}: UNVERIFIABLE (not recorded)")
+            return None
+        rec = {"purpose": purpose, "contract": contract, "commit": commit, "model": "replay", "input_tokens": 0, "output_tokens": 0}
+        with self.log_path.open("a") as f:
+            f.write(json.dumps(rec) + "\n")
+        return {"parsed": extract_json(text), "text": text, "usage": rec}
+
+
+def make_replay_run_spec(tests, fix_to_contract):
+    def replay_run_spec(repo, commit, spec, timeout=600):
+        cid = fix_to_contract.get(spec.source_commit)
+        rec = tests.get((cid, commit)) or tests.get((cid, repo.rev_parse(commit)))
+        if rec is None:
+            return testrun.TestResult("unavailable", "not recorded", "", "replay")
+        return testrun.TestResult(rec["outcome"], rec["summary"] + " [replayed]", rec.get("tail", ""), rec.get("python", "replay"))
+    return replay_run_spec
+
+
+def main():
+    t0 = time.time()
+    for repo in (".targets/django", ".targets/openssh-portable"):
+        if not Path(repo, ".git").exists():
+            print(f"missing {repo}: clone the targets first (README, 'Reproduce from scratch')"); return 2
+    model_idx, test_idx = build_index()
+    print(f"replay mode: model responses recorded {recorded_date()} "
+          f"({len(model_idx)} responses; tier-1 test outcomes replayed from the same run)")
+    if OUT.exists():
+        import shutil; shutil.rmtree(OUT)
+    (OUT / "contracts").mkdir(parents=True); (OUT / "verdicts").mkdir(); (OUT / "completeness").mkdir()
+    contract_mod.TESTS_DIR = OUT / "contracts" / "tests"
+    fix_to_contract = {json.loads(p.read_text())["fix_commit"]: json.loads(p.read_text())["id"] for p in Path("contracts").glob("CVE-*.json")}
+    testrun.run_spec = make_replay_run_spec(test_idx, fix_to_contract)
+    model = ReplayModelClient(model_idx, OUT / "model_calls.jsonl")
+
+    for cid, repo_path, fix, adv, rng, include in CASES:
+        print(f"\n== {cid}")
+        c = create_contract(repo_path, fix, cid, adv, model)
+        c.save(OUT / "contracts")
+        t1 = next(e for e in c.evidence_at_creation if e.tier == 1)
+        print(f"  create: property: {c.property[:110]}...\n          tier 1: {t1.detail[:110]}")
+        repo = Repo(Path(repo_path))
+        print(f"  walk {rng}:")
+        vs = walk_contract(c, repo, rng, 40, model, None, include, run_tests=True, out_dir=OUT / "verdicts")
+        k = complete_contract(c, repo, model)
+        (OUT / "completeness" / f"{cid}.json").write_text(json.dumps(k, indent=2) + "\n")
+        print(f"  complete: {k['verdict']} | uncovered: {[(u.get('file'), u.get('confidence')) for u in k['uncovered']]}")
+
+    vs = load_all_verdicts(OUT / "verdicts")
+    (OUT / "report.md").write_text(render_report(vs, Path("results/showcase.json")))
+    print(f"\nreport: demo_out/report.md ({len(vs)} verdicts). Not recorded: {len(model.missing)}. "
+          f"Elapsed {time.time()-t0:.1f}s. Nothing under results/ was modified.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

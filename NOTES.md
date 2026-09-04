@@ -135,3 +135,17 @@ Decisions and surprises, in the order they happened. For the writeup.
   pattern. Not tuned after seeing the result.
 - Truncator and strip_tags misses are structural: the gap is an insufficient guard on the same path, which a
   "which consumers lack the guard" question cannot express.
+
+## 2026-09-03 — demo PR and replay demo
+
+- Demo PR on the fork glenfmessenger/django (created with `gh repo fork --clone=false`; never against django/django):
+  https://github.com/glenfmessenger/django/pull/1. Base `holdfast-base` = 78fea27f69; head `holdfast/cve-2021-28658` =
+  cherry-pick of d4d800ca1a, then UploadedFile and FieldFile coverage adapted from 0b79eb3691 (CVE-2021-31542; the
+  note is in the 3.2.1/3.1.9/2.2.21 release notes, not 3.2.2/3.1.10), then the record + kept test. 52 tests in the
+  touched modules pass at head on Python 3.9. Two '???'/'$.$.$' candidates dropped from the adapted FieldFile test
+  because they depend on the get_valid_filename() part of that fix, which the branch does not take.
+- Inline review comments must sit on diff lines; the consuming line uploadedfile.py:43 is outside the hunk, so the
+  comment is anchored on the new validate_file_name call (line 51) and names line 43 in its text.
+- `./demo` replays create -> walk -> complete -> report for the three tour cases from recorded model responses
+  (indexed from contracts/, results/verdicts/, results/completeness/) and recorded tier-1 outcomes. 8 seconds, no key.
+  The OpenSSH completeness step is UNVERIFIABLE (not recorded) because it was never run live. Writes only demo_out/.

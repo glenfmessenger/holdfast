@@ -1,32 +1,37 @@
 # Holdfast
 
+## Five-minute tour
+
+**CVE-2021-28658, the miss that matters.** Django's fix `d4d800ca1a` moved HTML-unescaping ahead of path stripping in
+`MultiPartParser`; the contract's extracted test fails on the parent and passes on the fix
+([contract](contracts/CVE-2021-28658.json)). The completeness check was then handed every file referencing the fix's
+symbols, saw `django/core/files/uploadedfile.py`, and judged its bare `os.path.basename` "a separate, pre-existing
+defense-in-depth layer" because it did not know that pattern was the one the fix had just replaced; it returned COMPLETE
+([result](results/completeness/CVE-2021-28658.json), [summary](results/completeness.md)). Django patched `UploadedFile`
+and `FieldFile` four weeks later as CVE-2021-31542. What the tool should have produced is shown as a
+[demo PR on a fork](https://github.com/glenfmessenger/django/pull/1): the fix, the two sibling patches adapted from Django's own later fix, and the remediation record.
+
+**CVE-2021-45452, the one it caught.** Asked the same question about `Storage.save()`, the check flagged
+`django/contrib/staticfiles/storage.py` at medium confidence: staticfiles calls `_save()` directly, so the new
+`validate_file_name` guard in `save()` never runs on that path
+([result](results/completeness/CVE-2021-45452.json)). The file matched the
+[pre-registered expectation](results/completeness_labels.json); the mechanism did not (I had pre-registered the
+overridden-`generate_filename` route that became CVE-2024-39330).
+
+**OpenSSH CVE-2024-6387, regreSSHion.** Walking forward from the 2006 fix, the tool returned REGRESSED at `752250caab`,
+where `sigdie` was renamed to `sshsigdie` and the `#ifdef DO_LOG_SAFE_IN_SIGHAND` guard dropped; the tier-4 rationale
+names the rename ([verdict](results/verdicts/CVE-2006-5051/752250caab.json)), and the same stack produced 22 false
+REGRESSED across Django ([eval](results/eval.md), [report](results/report.md)).
+
+Across 20 Django fixes and about 350 later commits, fixes were rarely undone and often incomplete.
+`./demo` replays all three cases in about ten seconds from recorded responses, with no API key.
+
 ## What it does
 
 Holdfast turns a security fix into a **remediation contract**: the property the fix establishes, its scope, and tiered
 evidence. It re-verifies that property on every later commit touching the scope, one verdict per fix per commit: HELD,
 REGRESSED, INCOMPLETE_AT_MERGE, MOVED or UNVERIFIABLE. Tiers never blend: executed test (1), guard lines (2),
 resurrection rule (3), model judgement (4). Run on 20 Django CVE fixes and the OpenSSH fix behind CVE-2024-6387.
-
-## How to run it
-
-```sh
-uv venv .venv --python 3.13 && uv pip install -e ".[dev]" --python .venv/bin/python
-git clone https://github.com/django/django.git .targets/django            # targets are gitignored, never vendored
-git clone https://github.com/openssh/openssh-portable.git .targets/openssh-portable
-uv python install 3.9 3.11                                                 # old Django does not import on 3.13
-uv venv .targets/venv39 --python 3.9  && uv pip install --python .targets/venv39/bin/python asgiref pytz sqlparse
-uv venv .targets/venv311 --python 3.11 && uv pip install --python .targets/venv311/bin/python asgiref sqlparse
-
-export ANTHROPIC_API_KEY=sk-ant-...        # tier 4. Without it: tier 4 is recorded as "not attempted: no-api-key",
-                                            # properties are templates, and inconclusive walks end UNVERIFIABLE.
-.venv/bin/holdfast create --repo .targets/django --fix d4d800ca1a --advisory CVE-2021-28658
-.venv/bin/holdfast walk   --contract CVE-2021-28658 --repo .targets/django --range d4d800ca1a..8d9901c961
-.venv/bin/holdfast report                   # -> results/report.md
-.venv/bin/holdfast eval --labels results/labels.json   # -> results/eval.md
-./scripts/create_all.sh && ./scripts/walk_all.sh       # everything in contracts/targets.json
-```
-
-`--model` overrides `claude-sonnet-5`; tier 4 is capped at 150 logged calls per run, then UNVERIFIABLE ("budget").
 
 ## What's real vs stubbed
 
@@ -93,3 +98,24 @@ common failure in this sample and the one the current scope definition cannot se
 1. **Re-anchor contracts on HELD**; today one rewrite blinds tier 2 forever.
 2. **Scope from data flow rather than call graph, with copy detection as well as rename detection.**
 3. **Separate property tests from behaviour tests.**
+
+## Reproduce from scratch
+
+```sh
+uv venv .venv --python 3.13 && uv pip install -e ".[dev]" --python .venv/bin/python
+git clone https://github.com/django/django.git .targets/django            # targets are gitignored, never vendored
+git clone https://github.com/openssh/openssh-portable.git .targets/openssh-portable
+uv python install 3.9 3.11                                                 # old Django does not import on 3.13
+uv venv .targets/venv39 --python 3.9  && uv pip install --python .targets/venv39/bin/python asgiref pytz sqlparse
+uv venv .targets/venv311 --python 3.11 && uv pip install --python .targets/venv311/bin/python asgiref sqlparse
+
+export ANTHROPIC_API_KEY=sk-ant-...        # tier 4. Without it: tier 4 is recorded as "not attempted: no-api-key",
+                                            # properties are templates, and inconclusive walks end UNVERIFIABLE.
+.venv/bin/holdfast create --repo .targets/django --fix d4d800ca1a --advisory CVE-2021-28658
+.venv/bin/holdfast walk   --contract CVE-2021-28658 --repo .targets/django --range d4d800ca1a..8d9901c961
+.venv/bin/holdfast report                   # -> results/report.md
+.venv/bin/holdfast eval --labels results/labels.json   # -> results/eval.md
+./scripts/create_all.sh && ./scripts/walk_all.sh       # everything in contracts/targets.json
+```
+
+`--model` overrides `claude-sonnet-5`; tier 4 is capped at 150 logged calls per run, then UNVERIFIABLE ("budget").
