@@ -4,12 +4,12 @@
 
 Holdfast is a merge-time completeness check plus an evidence-tiered remediation record, inside Claude Security: the
 completeness and durability layer on top of Claude Security's remediation. It is for AppSec and engineering teams
-already merging Claude-generated patches. It ships as a fourth item in the `/claude-security` menu, Close finding.
+already merging Claude-generated patches. It is proposed as a fourth item in the `/claude-security` menu, Close finding.
 
 The finding behind it: fixes are rarely undone and often incomplete. Of 20 fixes studied, 5 were revisited by a later
 CVE in the same function; none silently regressed in the walked, sampled history. The v1 stance is low recall and zero
-false flags, UNVERIFIABLE over guessing, evidence never blended: in the F1 record, the cannot-verify field described
-the consumer the verdict missed. Continuous re-verification of the property across
+false flags, UNVERIFIABLE over guessing, evidence never blended: in the demo, the record's cannot-verify field named
+the consumer its own verdict missed. Continuous re-verification of the property across
 refactoring is the six-month direction; the walk below is the experiment that showed why.
 
 **What closing a finding produces**
@@ -32,7 +32,8 @@ demo path taken.
 ## Inside Claude Security
 
 The flow, end to end: `/claude-security` → **Scan codebase** → **Suggest patches** → **Close finding** (shipped here as
-`/holdfast close`) → derived findings back through **Suggest patches** → one PR per patch. Close finding builds the
+`/holdfast close`) → derived findings back through **Suggest patches** → one PR per patch. Close finding runs after the
+plugin's independent review has vouched for the patch and before anything is applied. Close finding builds the
 contract from the patch applied at the report's stamped revision, runs the completeness query, appends derived findings
 `F<n>.1`, `F<n>.2` ... to the report's JSONL with a note each and a `derived_from` field, commits the patch and the
 record (`.holdfast/records/F<n>.json`) on a branch from the stamped revision, and opens a PR on your fork. Holdfast
@@ -86,7 +87,7 @@ Asked the same question about `Storage.save()`, the check flagged
 `django/contrib/staticfiles/storage.py` at medium confidence: staticfiles calls `_save()` directly, so the new
 `validate_file_name` guard in `save()` never runs on that path
 ([result](results/completeness/CVE-2021-45452.json)). The file matched the
-[pre-registered expectation](results/completeness_labels.json); the mechanism did not (I had pre-registered the
+[pre-registered expectation](results/completeness_labels.json); the mechanism did not (the pre-registered expectation was the
 overridden-`generate_filename` route that became CVE-2024-39330).
 
 ### Example: a regression through a rename (OpenSSH, CVE-2024-6387)
@@ -136,7 +137,7 @@ To re-run the full evaluation (API key, ~40 minutes), see [REPRODUCING.md](REPRO
 ## Results
 
 Across all 392 verdicts, 1 of 23 REGRESSED is a real regression (OpenSSH); the other 22 are false alarms.
-21 contracts, 150 tier-4 calls (cap hit; 8 UNVERIFIABLE "budget"). 356 HELD, 23 REGRESSED, 1 MOVED, 12 UNVERIFIABLE;
+21 contracts, 150 tier-4 calls in the walk (cap hit; 8 UNVERIFIABLE "budget"). 356 HELD, 23 REGRESSED, 1 MOVED, 12 UNVERIFIABLE;
 deciding tier 134 / 127 / 8 / 123. **HELD decided by tier 4 alone: 108 of 356.** Tables: `results/report.md`, `results/eval.md`.
 
 Labelled eval, 25 pairs pre-registered before any walk (24 walked): exact-status agreement 20/24 = 0.83
@@ -150,7 +151,7 @@ unlabelled pairs: the matcher failed where nobody had predicted it would.
 
 ### Completeness check (value-flow query)
 
-`holdfast complete` asks, at the fix commit, whether the protected value still flows to a consumer the fix did not
+`holdfast complete` asks, at the fix commit, whether the protected value flows to a consumer the fix did not
 reach, with context widened to every file referencing the fix's symbols (cap 25). Pre-registered on six contracts:
 1 of 4 INCOMPLETE cases caught (CVE-2021-45452, `django/contrib/staticfiles/storage.py` calling `_save()` directly),
 both COMPLETE cases correct, no false flags. It missed CVE-2021-28658's siblings: it saw `django/core/files/uploadedfile.py`
