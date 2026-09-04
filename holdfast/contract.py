@@ -54,18 +54,20 @@ def build_scope(repo: Repo, fix: str, diff: str, files: list[str]) -> tuple[Scop
         src = repo.show_file(fix, h.path)
         if src is None:
             continue
-        linenos = {ln for ln, t in h.added if substantive(t)}
+        lang = "py" if h.path.endswith(".py") else "c"
+        linenos = {ln for ln, t in h.added if substantive(t, lang)}
         if h.path.endswith(".py"):
             names = enclosing_qualnames(src, linenos)
         else:
             names = c_enclosing_functions(src, linenos)
         functions += [f"{h.path}::{n}" for n in names]
-    guard = [normalize(l) for l in added_lines if substantive(l)]
-    removed = [normalize(l) for l in removed_lines if substantive(l)]
+    lang = "py" if any(f.endswith(".py") for f in files) else "c"
+    guard = [normalize(l) for l in added_lines if substantive(l, lang)]
+    removed = [normalize(l) for l in removed_lines if substantive(l, lang)]
     # lines that merely moved (present in both) are not guards
     guard_only = [g for g in guard if g not in removed]
     removed_only = [r for r in removed if r not in guard]
-    symbols = list(dict.fromkeys(defined_names(added_lines) + called_names([l for l in added_lines if substantive(l)])))
+    symbols = list(dict.fromkeys(defined_names(added_lines) + called_names([l for l in added_lines if substantive(l, lang)])))
     symbols = [s for s in symbols if s not in ("self", "cls")][:25]
     fn_names = [f.split("::")[-1].split(".")[-1] for f in functions] + defined_names(added_lines)
     callers = find_callers(repo, fix, list(dict.fromkeys(fn_names)), files, _lang_glob(files))

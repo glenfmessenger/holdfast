@@ -70,10 +70,14 @@ def normalize(line: str) -> str:
     return re.sub(r"\s+", " ", line.strip())
 
 
-def substantive(line: str) -> bool:
+def substantive(line: str, lang: str = "py") -> bool:
     s = line.strip()
-    if not s or s.startswith(("#", "//", "*", "/*", '"""', "'''")):
+    if not s or s.startswith(("//", "*", "/*", '"""', "'''")):
         return False
+    if s.startswith("#"):
+        # Python comment, or a C preprocessor line (which IS substantive: #ifdef guards carry properties)
+        if lang == "py" or not re.match(r"#\s*(if|ifdef|ifndef|else|elif|endif|define|undef|include)\b", s):
+            return False
     if s in ("pass", "else:", "try:", "{", "}", "):", ")"):
         return False
     return len(s) > 3

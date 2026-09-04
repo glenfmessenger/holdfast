@@ -77,6 +77,114 @@
       "rationale": "This is the CVE-2021-31542 fix (2021-04-14), four weeks after the contract's fix. sanitize_file_name keeps the ordering the contract depends on (html.unescape FIRST, then separator stripping) and strengthens it: rfind('\\\\')/os.path.basename are replaced by rsplit('/') and rsplit('\\\\'), and '', '.', '..' now return None. Two of the six recorded guard lines disappear verbatim while the property is intact and stronger. A line-matching structural check will see guard lines missing -- this is a false-resurrection trap, pre-registered.",
       "pre_registration": "false-resurrection trap inside the first contract's walk",
       "showcase_candidate": "3 if the tool says HELD/MOVED with reasoning that the guard was rewritten, not removed; 4 if it says REGRESSED"
+    },
+    {
+      "contract": "CVE-2019-12781",
+      "commit": "8bcb00858e",
+      "expected": "HELD",
+      "rationale": "Moves HttpRequest.get_raw_uri() out of request.py; the diff does not touch HttpRequest.scheme or the SECURE_PROXY_SSL_HEADER branch."
+    },
+    {
+      "contract": "CVE-2019-12781",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
+    },
+    {
+      "contract": "CVE-2019-14232",
+      "commit": "e3d0b4d550",
+      "expected": "HELD",
+      "rationale": "re.compile -> _lazy_re_compile for re_words/re_chars; the regex bodies r'<[^>]+?>|([^<>\\s]+)' and r'<[^>]+?>|(.)' are byte-identical. Both guard lines are rewritten, property intact.",
+      "pre_registration": "rewrite trap"
+    },
+    {
+      "contract": "CVE-2019-14233",
+      "commit": "e3d0b4d550",
+      "expected": "HELD",
+      "rationale": "Same lazy-regex commit touching html.py; the diff has no hunk in strip_tags()/_strip_once (verified: no strip_tags/count lines in the diff)."
+    },
+    {
+      "contract": "CVE-2019-14235",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
+    },
+    {
+      "contract": "CVE-2021-33571",
+      "commit": "bdf3e156b4",
+      "expected": "HELD",
+      "rationale": "\\d -> [0-9] in ipv4_re. The octet alternation (?:0|25[0-5]|2[0-4][0-9]|1[0-9]?[0-9]?|[1-9][0-9]?) keeps exactly the no-leading-zero structure the fix introduced; the pattern is also split across lines. Every guard line changes, property intact.",
+      "pre_registration": "rewrite trap"
+    },
+    {
+      "contract": "CVE-2022-36359",
+      "commit": "cbce427c17",
+      "expected": "MOVED",
+      "rationale": "Fixed #34194 moves the Content-Disposition construction out of FileResponse.set_headers into django.utils.http.content_disposition_header(); the escaping chain filename.replace('\\\\','\\\\\\\\').replace('\"', r'\\\"') and the filename*=utf-8'' fallback are carried verbatim into django/utils/http.py, and set_headers now calls the helper. Property intact, relocated to a file outside the contract's scope.",
+      "pre_registration": "move case",
+      "showcase_candidate": "3 if MOVED/HELD; 4 if REGRESSED"
+    },
+    {
+      "contract": "CVE-2022-28346",
+      "commit": "1297c0d0d7",
+      "expected": "HELD",
+      "rationale": "Fixed #31679 (delayed annotating aggregations) ADDS a third self.check_alias(alias) call at query.py:392; the two existing calls in add_annotation/add_extra remain (lines 1085, 2285)."
+    },
+    {
+      "contract": "CVE-2019-19118",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap; sampled contract"
+    },
+    {
+      "contract": "CVE-2019-19844",
+      "commit": "f64c528c17",
+      "expected": "HELD",
+      "rationale": "Refs #34429 creates SetPasswordMixin; the diff has no hunk touching PasswordResetForm.get_users or _unicode_ci_compare (verified)."
+    },
+    {
+      "contract": "CVE-2019-19844",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
+    },
+    {
+      "contract": "CVE-2020-13596",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
+    },
+    {
+      "contract": "CVE-2021-45116",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
+    },
+    {
+      "contract": "CVE-2022-22818",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
+    },
+    {
+      "contract": "CVE-2019-12308",
+      "commit": "2dd4d110c1",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2020-13596 fix in the same file (admin/widgets.py); it changes ForeignKeyRawIdWidget.get_context only. AdminURLFieldWidget.get_context and its URLValidator call are untouched."
+    },
+    {
+      "contract": "CVE-2021-33203",
+      "commit": "9c19aff7c7",
+      "expected": "HELD",
+      "rationale": "Refs #33476 Black reformat (2022-02-07): whitespace and quote-style only, no semantic change. Django moved to double quotes here, so every guard line recorded with single quotes disappears verbatim while the code is identical. Formatting trap.",
+      "pre_registration": "formatting trap"
     }
   ],
   "contract_expectations": [
@@ -108,5 +216,6 @@
       "tool_expected_to_catch": false,
       "why_not": "The grep-based sibling check searches only scope files plus one hop of callers. uploadedfile.py is not a caller of MultiPartParser; it is a sibling consumer of the same untrusted name. The check found zero similar patterns at creation (recorded in the contract). Only tier 4 could flag this, and the model was unavailable at creation (invalid API key)."
     }
-  ]
+  ],
+  "_note_on_black_pairs": "Seven pairs are the 2022-02-07 Black reformat. They are deliberately over-represented: the structural tier compares whitespace-normalized lines but not quote style, so this one commit tests the same failure mode across seven contracts. Counted as-is in the eval; the README states this."
 }
