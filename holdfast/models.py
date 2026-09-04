@@ -73,6 +73,7 @@ class Contract:
     parent_commit: str = ""
     fix_subject: str = ""
     created_from_note: str = ""   # release-note path used as advisory text
+    removed_lines: list[str] = field(default_factory=list)  # pre-fix lines the fix deleted (tier-3 rule input)
 
     def save(self, directory: Path = CONTRACTS_DIR) -> Path:
         directory.mkdir(parents=True, exist_ok=True)

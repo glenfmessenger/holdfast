@@ -84,9 +84,16 @@ class Repo:
         return [l.split(":", 2)[-1] for l in r.stdout.splitlines()]
 
     def worktree(self, ref: str, dest: Path) -> None:
+        import shutil
+        dest = dest.resolve()
         if dest.exists():
             self.run("worktree", "remove", "--force", str(dest), check=False)
+            shutil.rmtree(dest, ignore_errors=True)
+        self.run("worktree", "prune")
+        dest.parent.mkdir(parents=True, exist_ok=True)
         self.run("worktree", "add", "--detach", str(dest), ref)
 
     def remove_worktree(self, dest: Path) -> None:
-        self.run("worktree", "remove", "--force", str(dest), check=False)
+        import shutil
+        self.run("worktree", "remove", "--force", str(dest.resolve()), check=False)
+        shutil.rmtree(dest, ignore_errors=True)

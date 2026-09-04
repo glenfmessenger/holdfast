@@ -32,3 +32,33 @@ Decisions and surprises, in the order they happened. For the writeup.
     `sigdie` -> `sshsigdie` (with a `#define sigdie ssh_sigdie` shim in `log.h`), so the
     regressing commit is simultaneously a move and a regression. Good stress test.
   - 16 commits touch `log.c` between the two; under the 40-commit cap.
+
+## 2026-09-03 — first contract (CVE-2021-28658)
+
+- **API key is invalid.** `ANTHROPIC_API_KEY` is set (108 chars, `sk-ant-api...`) but the API
+  returns 401 on `/v1/models`. Tier 4 is therefore "not attempted: api-key-invalid" for now, and
+  the first contract's `property` is a template, not a model-stated invariant. The client now
+  disables itself on a 401 instead of crashing, and does not count the failed call against the budget.
+- **Regression tests are extracted, not synthesized.** `create` takes the test files the fix commit
+  touched, finds test methods whose lines the fix added/modified (via `ast`), and runs exactly those
+  ids: on the parent with the *fix commit's* test files overlaid (must fail) and on the fix (must pass).
+  For CVE-2021-28658 that is 3 test ids; parent: 2 failures + 14 errors (the new
+  `sanitize_file_name` method doesn't exist yet), fix: all ok. The spec is stored in
+  `contracts/tests/<id>_regression.json` — no Django test source is copied into this repo.
+- **Fixture-error policy.** Django's own `file_uploads/tests.py` at the fix commit double-removes
+  MEDIA_ROOT (an `addCleanup` plus `tearDownClass`), so running the subset always ends with one
+  tearDownClass error. Per-test outcomes are parsed from `-v2` output; setUpClass/tearDownClass
+  errors are recorded in the summary but do not veto a pass. Test-method errors still do.
+- **Interpreter choice.** Old Django doesn't import on Python 3.13 (`cgi` removed). `python_requires`
+  at each commit picks `.targets/venv39` (>=3.6/3.8 era) or `.targets/venv311` (>=3.10 era).
+  Bug found on the way: resolving the venv's `python` symlink escapes the venv; use the abspath.
+- **Worktree bug.** `git -C repo worktree add <relative>` resolves the path relative to the repo,
+  not the caller. Always pass absolute paths.
+- **Sibling check is grep-only at the moment** (removed lines' call patterns in scope + one-hop
+  callers). For CVE-2021-28658 it found nothing. The follow-up CVE-2021-31542 four weeks later
+  says the same sanitation was missing in `UploadedFile` and `FieldFile` — `uploadedfile.py:42`
+  had the same `os.path.basename(name)` pattern at fix time, but it is not a caller, so the
+  one-hop rule never looks at it. Pre-registered as an expected miss in `results/labels.json`.
+- CVE-2021-31542 also *rewrites* two of this contract's six guard lines (rfind/basename ->
+  rsplit) while strengthening the property. Pre-registered as a false-resurrection trap:
+  expected HELD, a REGRESSED verdict there is a miss.

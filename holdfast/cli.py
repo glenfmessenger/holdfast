@@ -17,6 +17,7 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--advisory-text", help="path to advisory text; default: find release note in repo")
     c.add_argument("--test-cmd", help="how to run a targeted test (see docs); omit to skip tier 1")
     c.add_argument("--no-model", action="store_true", help="never call the model")
+    c.add_argument("--no-tests", action="store_true", help="skip tier-1 execution")
     c.add_argument("--model", default=None)
 
     w = sub.add_parser("walk", help="evaluate a contract against later commits")

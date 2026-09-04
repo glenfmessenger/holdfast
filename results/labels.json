@@ -1,0 +1,112 @@
+{
+  "_about": "Hand-labelled ground truth for (contract, later-commit) pairs. Written BEFORE any walk ran. Not adjusted afterwards. Contract ids are the advisory ids. The walk end for Django is 8d9901c961 (2024-12-27).",
+  "_written": "2026-09-03",
+  "_status_vocabulary": [
+    "HELD",
+    "REGRESSED",
+    "INCOMPLETE_AT_MERGE",
+    "MOVED",
+    "UNVERIFIABLE"
+  ],
+  "pairs": [
+    {
+      "contract": "CVE-2019-14232",
+      "commit": "17b51094d778b421bb2b3aae0c270894b050455d",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2023-43665 fix. The 2019 guard (simplified re_words/re_chars regexes) is unchanged at this commit; the commit ADDS a 5M-char MAX_LENGTH_HTML cap. Nothing the 2019 fix established was removed, so the narrow property held. See contract_expectations: the real finding is that the 2019 fix was incomplete against its own advisory.",
+      "pre_registration": "chained-CVE case",
+      "showcase_candidate": "4 (miss) if the tool reports REGRESSED here, or fails to flag incompleteness at creation"
+    },
+    {
+      "contract": "CVE-2019-14233",
+      "commit": "49ff1042aa66bb25eda87e9a8ef82f3b0ad4eeba",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2024-53907 fix. The 2019 guard (stop looping when value.count('<') stops changing) is still present at html.py:224; the commit ADDS MAX_STRIP_TAGS_DEPTH=50 and raises SuspiciousOperation. The 2019 property (no unbounded no-progress recursion) held; the 2019 fix was incomplete against the advisory (see contract_expectations).",
+      "pre_registration": "chained-CVE case"
+    },
+    {
+      "contract": "CVE-2019-14235",
+      "commit": "3f41d6d62929dfe53eda8109b3b836f26645bdce",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2023-41164 fix. The 2019 property (repercent_broken_unicode uses a loop, not recursion) is intact -- the 'while True' and the CVE-2019-14235 comment are still at encoding.py:224-228. The commit replaces the loop's quadratic string rebuild with a list join. That quadratic cost was introduced BY the 2019 fix, so this is a new vulnerability created by the remediation rather than a removal of it. Ground truth for the stated property: HELD.",
+      "pre_registration": "chained-CVE case",
+      "note": "I do NOT label the 2019 fix INCOMPLETE_AT_MERGE: the 2019 advisory is about recursion/memory and the fix fully removed recursion. Expect tier 4 to be tempted to call this INCOMPLETE; if it does, that is recorded as a disagreement, not a hit."
+    },
+    {
+      "contract": "CVE-2023-23969",
+      "commit": "9e9792228a6bb5d6402a5d645bc3be4cf364aefb",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2024-39614 fix. The 2023 guard (parse_accept_lang_header wrapper truncating to 500 chars before the cached parser) is intact, but the constant is RENAMED ACCEPT_LANGUAGE_HEADER_MAX_LENGTH -> LANGUAGE_CODE_MAX_LENGTH and reused for a new cap in get_supported_language_variant. Property held; only a symbol name changed. A structural check keyed on the literal constant name will see the guard 'disappear' -- this is a false-resurrection trap.",
+      "pre_registration": "chained-CVE case; also a false-resurrection trap",
+      "showcase_candidate": "3 if the tool says HELD/MOVED with the rename reasoning; 4 if it says REGRESSED",
+      "note": "The 2024 CVE is a different entry point (language code from cookie/URL prefix into get_supported_language_variant), not the Accept-Language header cache the 2023 advisory describes. I do not label the 2023 fix INCOMPLETE_AT_MERGE."
+    },
+    {
+      "contract": "CVE-2021-45452",
+      "commit": "fe4a0bbe2088d0c2b331216dad21ccd0bb3ee80d",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2024-39330 fix. The 2021 guard (validate_file_name(name, allow_relative_path=True) on the name returned by _save, plus backslash normalisation in get_available_name/generate_filename, plus relpath in FileSystemStorage._save) is all still present in storage/base.py and storage/filesystem.py. The commit ADDS validation before and after get_available_name to cover subclasses that override generate_filename. Nothing was removed.",
+      "pre_registration": "chained-CVE case"
+    },
+    {
+      "contract": "CVE-2021-45452",
+      "commit": "032c09c414",
+      "expected": "MOVED",
+      "rationale": "storage.py split into the storage/ package (base.py, filesystem.py, memory.py) on 2022-11-10. The guard lines are carried over verbatim into the new files; nothing about the property changed. Correct verdict is MOVED (property intact, scope relocated).",
+      "pre_registration": "rename case"
+    },
+    {
+      "contract": "CVE-2020-24583",
+      "commit": "032c09c414",
+      "expected": "MOVED",
+      "rationale": "Same storage.py -> storage/filesystem.py split. The directory-permission fix in FileSystemStorage._save moves with the class.",
+      "pre_registration": "rename case"
+    },
+    {
+      "contract": "CVE-2006-5051",
+      "commit": "752250caabda3dd24635503c4cd689b32a650794",
+      "expected": "REGRESSED",
+      "rationale": "OpenSSH regreSSHion (CVE-2024-6387). Qualys: 'This regression was introduced in October 2020 (OpenSSH 8.5p1) by commit 752250c (\"revised log infrastructure for OpenSSH\"), which accidentally removed an \"#ifdef DO_LOG_SAFE_IN_SIGHAND\" from sigdie()'. Confirmed in the repo: the hunk deletes sigdie() with its #ifdef and adds sshsigdie() that calls sshlogv() unconditionally before _exit(1). The property (sigdie never calls non-async-signal-safe logging on non-OpenBSD platforms) is gone.",
+      "pre_registration": "OpenSSH showcase; tiers 2-4 only, no build/test",
+      "specific_failure_under_test": "A MOVED verdict here is the specific failure being tested for. The same commit renames sigdie -> sshsigdie (with '#define sigdie ssh_sigdie' in log.h), so a matcher that sees 'function moved, guard lines absent from old location' and stops at MOVED would be wrong: the guard is absent from the new location too."
+    },
+    {
+      "contract": "CVE-2021-28658",
+      "commit": "0b79eb36915d178aef5c6a7bbce71b1e76d376d3",
+      "expected": "HELD",
+      "rationale": "This is the CVE-2021-31542 fix (2021-04-14), four weeks after the contract's fix. sanitize_file_name keeps the ordering the contract depends on (html.unescape FIRST, then separator stripping) and strengthens it: rfind('\\\\')/os.path.basename are replaced by rsplit('/') and rsplit('\\\\'), and '', '.', '..' now return None. Two of the six recorded guard lines disappear verbatim while the property is intact and stronger. A line-matching structural check will see guard lines missing -- this is a false-resurrection trap, pre-registered.",
+      "pre_registration": "false-resurrection trap inside the first contract's walk",
+      "showcase_candidate": "3 if the tool says HELD/MOVED with reasoning that the guard was rewritten, not removed; 4 if it says REGRESSED"
+    }
+  ],
+  "contract_expectations": [
+    {
+      "contract": "CVE-2019-14232",
+      "expected_sibling_check": "INCOMPLETE_AT_MERGE",
+      "rationale": "The 2023 release note says outright: 'Following the fix for CVE-2019-14232, the regular expressions ... were revised and improved. However, these regular expressions still exhibited linear backtracking complexity'. Same function, same advisory title, same html=True vector. The 2019 fix did not fully establish 'Truncator with html=True is not a DoS vector'.",
+      "tool_expected_to_catch": false,
+      "why_not": "The creation-time sibling check looks for similar code patterns in scope; it has no way to reason about regex complexity classes. This is a pre-registered likely miss (case 4 candidate)."
+    },
+    {
+      "contract": "CVE-2019-14233",
+      "expected_sibling_check": "INCOMPLETE_AT_MERGE",
+      "rationale": "CVE-2024-53907 has the identical title and identical first paragraph ('large sequences of nested incomplete HTML entities'). The 2019 fix stopped the no-progress case but left bounded-progress deep recursion unbounded (hence the 2024 depth cap of 50).",
+      "tool_expected_to_catch": false,
+      "why_not": "Same reason: the incompleteness is algorithmic, not a missing sibling call site."
+    },
+    {
+      "contract": "CVE-2021-45452",
+      "expected_sibling_check": "INCOMPLETE_AT_MERGE",
+      "rationale": "CVE-2024-39330: 'Derived classes ... which override generate_filename() without replicating the file path validations existing in the parent class, allowed for potential directory-traversal ... when calling save()'. The 2021 fix put validation in overridable hooks rather than at the save() entry point, so the advisory's property ('Storage.save() does not allow directory traversal via crafted names') was not fully established for subclasses.",
+      "tool_expected_to_catch": false,
+      "why_not": "Would require reasoning about override points in the class hierarchy. The sibling grep may notice that validate_file_name is called in get_available_name/generate_filename but not before them in save(); the model tier might flag it. Recorded as 'possible'."
+    },
+    {
+      "contract": "CVE-2021-28658",
+      "expected_sibling_check": "INCOMPLETE_AT_MERGE",
+      "rationale": "CVE-2021-31542's note: 'MultiPartParser, UploadedFile, and FieldFile allowed directory-traversal via uploaded files with suitably crafted file names.' At the contract's fix commit, django/core/files/uploadedfile.py:42 applies the same os.path.basename(name) pattern the fix moved away from, and sanitize_file_name still let '.', '..' and 'C:file.txt' through. The fix covered one of three sites.",
+      "tool_expected_to_catch": false,
+      "why_not": "The grep-based sibling check searches only scope files plus one hop of callers. uploadedfile.py is not a caller of MultiPartParser; it is a sibling consumer of the same untrusted name. The check found zero similar patterns at creation (recorded in the contract). Only tier 4 could flag this, and the model was unavailable at creation (invalid API key)."
+    }
+  ]
+}
