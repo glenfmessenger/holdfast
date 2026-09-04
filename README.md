@@ -4,9 +4,10 @@
 
 Holdfast is a merge-time completeness check plus an evidence-tiered remediation record, inside Claude Security: the
 completeness and durability layer on top of Claude Security's remediation. It is for AppSec and engineering teams
-already merging Claude-generated patches. It hooks into the plugin's fix job after the patch-verifier agent and before
-the patch file is written: it asks whether the value the fix protects still flows to a consumer the fix did not reach,
-and it writes a record of the property, the evidence by tier, and what could not be verified.
+already merging Claude-generated patches. It runs on the plugin's own artifacts: `/claude-security` scan, then Suggest patches, then `/holdfast` on a patched
+finding, which asks whether the value the fix protects still flows to a consumer the fix did not reach, appends any
+derived findings to the report in the plugin's schema, and writes a record of the property, the evidence by tier,
+and what could not be verified. Derived findings go back through Suggest patches, one PR per patch.
 
 The finding behind it: fixes are rarely undone and often incomplete. Of 20 fixes studied, 5 were revisited by a later
 CVE in the same function; none silently regressed in the walked, sampled history. The v1 stance is low recall and zero
@@ -71,6 +72,23 @@ git -C .targets/openssh-portable checkout 752250caab           # the regressing 
 or run `./demo` and let it clone them on first run: if `.targets/` is missing it prints what it is cloning and why
 (full history is needed for the walks), clones both, checks out the commits above, and continues. The first-run
 clone takes about 30 seconds and 400 MB (measured: 20 s, 412 MB); the replay itself takes about 8 seconds.
+
+## Inside Claude Security
+
+The flow, end to end: `/claude-security` **scan** writes `CLAUDE-SECURITY-<ts>/` (report, JSONL, SARIF, revision stamp);
+**Suggest patches** writes `patches/F<n>.patch` with a note beside it; **`/holdfast`** (`.claude/commands/holdfast.md`)
+finds the newest report, lists findings that have a patch, and runs `holdfast integrate --report <dir> --finding F<n>`,
+which builds the contract from the patch applied at the stamped revision, runs the completeness query, appends derived
+findings `F<n>.1`, `F<n>.2` ... to the JSONL with a note each and a `derived_from` field, writes `records/F<n>.json`,
+and appends a Holdfast section to the report; derived findings then go **back through Suggest patches**, and each
+patch ships in **its own PR**. Holdfast writes no patches. The schema it targets, and which fields were confirmed
+against the plugin source versus a real run, is in `NOTES.md`.
+
+Demo path taken: **B**, a hand-built report in the plugin's schema
+(`demo_artifacts/claude-security-path-b/`, see its `PROVENANCE.md`). Path A, the real plugin on the fork scoped to
+`django/http/`, was attempted once in a separate session and did not run: the plugin's scan needs the Workflow tool,
+which subagent sessions do not have, so no scan started. On the hand-built report `/holdfast` returned COMPLETE with
+zero derived findings, the same miss as the standalone check, now inside the plugin's artifacts.
 
 ## What's real vs stubbed
 

@@ -44,6 +44,13 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--no-model", action="store_true")
     k.add_argument("--model", default=None)
 
+    i = sub.add_parser("integrate", help="run Holdfast on one Claude Security finding (report dir + F<n>)")
+    i.add_argument("--report", required=True, help="CLAUDE-SECURITY-<ts> directory")
+    i.add_argument("--finding", required=True, help="finding id, e.g. F1")
+    i.add_argument("--repo", help="repository the report belongs to (default: parent of --report)")
+    i.add_argument("--no-model", action="store_true")
+    i.add_argument("--model", default=None)
+
     args = p.parse_args(argv)
     if args.cmd == "create":
         from .contract import create_command
@@ -51,6 +58,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "walk":
         from .walk import walk_command
         return walk_command(args)
+    if args.cmd == "integrate":
+        from .integrate import integrate_command
+        return integrate_command(args)
     if args.cmd == "complete":
         from .complete import complete_command
         return complete_command(args)

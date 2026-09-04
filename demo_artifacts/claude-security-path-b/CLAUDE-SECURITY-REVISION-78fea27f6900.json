@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-09-04T05:27:17+00:00",
+  "duration_s": 0,
+  "scan_id": "hand-built-demo-path-b",
+  "mode": "codebase",
+  "scan_prefix": "",
+  "scope": [
+    "django/http/"
+  ],
+  "revision": {
+    "commit": "78fea27f690028204c03c28d821cb0c0240a7398",
+    "dirty": false
+  },
+  "revision_source": "git",
+  "model": null,
+  "effort": "n/a (hand-built)",
+  "run_shape": {
+    "scope_files": 5
+  },
+  "findings": {
+    "total": 1,
+    "critical": 0,
+    "high": 1,
+    "medium": 0,
+    "low": 0
+  },
+  "verification": {
+    "status": "not-verified",
+    "candidates": 1,
+    "candidates_deduped": 1,
+    "panel_votes": 0,
+    "panel_reviewed_findings": 0,
+    "panel_quorum_findings": 0,
+    "unreviewed_candidate_sites": 1,
+    "incomplete_panel_candidates": 0,
+    "attested_findings": 0,
+    "reason": "hand-built report; no verifier panel ran",
+    "reason_kind": "hand-built"
+  }
+}

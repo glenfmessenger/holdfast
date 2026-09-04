@@ -149,3 +149,50 @@ Decisions and surprises, in the order they happened. For the writeup.
 - `./demo` replays create -> walk -> complete -> report for the three tour cases from recorded model responses
   (indexed from contracts/, results/verdicts/, results/completeness/) and recorded tier-1 outcomes. 8 seconds, no key.
   The OpenSSH completeness step is UNVERIFIABLE (not recorded) because it was never run live. Writes only demo_out/.
+
+## Claude Security plugin schema targeted by `holdfast integrate`
+
+Source: the installed plugin, `claude-security@claude-plugins-official` v0.11.0
+(`~/.claude/plugins/cache/claude-plugins-official/claude-security/0.11.0/scripts/lib/finding.py`,
+`render_report.py`, `patch_artifacts.py`, `skills/claude-security/jobs/*.md`), plus
+https://code.claude.com/docs/en/claude-security. Legend: **[src]** confirmed by reading the plugin source;
+**[doc]** stated in the doc only; **[run]** confirmed against a real plugin run in this session (filled in below
+after demo path A).
+
+- Report directory `CLAUDE-SECURITY-<UTC YYYYMMDD-HHMMSS>/` in the repository, with its own `.gitignore` = `*` [src][doc].
+- `CLAUDE-SECURITY-RESULTS.md` (human report), `CLAUDE-SECURITY-RESULTS.jsonl` (one finding per line, fixed field
+  order), `CLAUDE-SECURITY-RESULTS.sarif` (SARIF 2.1.0), `CLAUDE-SECURITY-REVISION-<sha12>[-dirty].json` [src][doc].
+- Finding fields, in order [src, `lib/finding.py` `Finding`/`Record`]: `id` (F<n>), `title`, `impact`, `file`
+  (scan-root-relative), `line`, `description`, `exploit_scenario`, `preconditions` (list), `category`,
+  `severity` ∈ CRITICAL/HIGH/MEDIUM/LOW, `confidence` ∈ low/medium/high, `recommendation`, `cwe_id`, `snippet`,
+  `symbol`, `declared_line`, then `claudeSecurityPluginFindingId` last. Holdfast adds `derived_from` before it.
+- Revision stamp keys [src, `render_report.py`]: `generated_at`, `duration_s`, `scan_id`, `mode`, `scan_prefix`,
+  `scope`, `revision` {`commit`, `dirty`, ...}, `revision_source`, `model`, `effort`, `run_shape`,
+  `findings` {total, critical, high, medium, low}, `verification` {status, candidates, ...}.
+- Patches [src, `patch_artifacts.py`; doc]: `patches/F<n>.patch` (raw diff below a `#` header comment that `git apply`
+  ignores), `patches/F<n>.md` note (also written alone for declined units), `patches/PATCHES.md` index,
+  `patches/patches.jsonl` (id, status, patch, note, claims, diffstat). Holdfast strips the header before applying.
+- Holdfast's additions (mine, not plugin schema): `records/F<n>.json`, `records/F<n>.advisory.txt`,
+  `patches/F<n>.<k>.md` notes for derived findings, appended JSONL lines, appended `## Holdfast` section.
+
+### What was confirmed against a real run
+
+Nothing yet. Demo path A (the real plugin on the fork at 78fea27f69, scoped to django/http/, in a separate session)
+did not run: the plugin's orchestrator, dispatched as a subagent, stopped at its tool check because the Workflow tool is
+not available to subagents in this session, so no scan started and no tokens went into scanning. Per the one-attempt
+rule I did not retry. Every field above is therefore [src] or [doc]; none is [run]. A session with the Workflow tool
+(dynamic workflows enabled) is what path A needs.
+
+### Demo path B (taken)
+
+- Hand-built `CLAUDE-SECURITY-20260904-052717/` in a worktree of the fork at 78fea27f69 (`.targets/django-b`), with
+  `PROVENANCE.md` stating so: F1 = the CVE-2021-28658 multipart traversal at multipartparser.py:215, patch =
+  Django's own fix d4d800ca1a restricted to multipartparser.py, patches.jsonl claims marked UNSURE, stamp
+  `verification.status = not-verified`, no SARIF.
+- `/holdfast` (i.e. `holdfast integrate --report ... --finding F1`): 31 s, 2 tier-4 calls (create + complete, from the
+  exercise pool; 8 of 12 now used). Verdict COMPLETE, zero derived findings, record written, Holdfast section
+  appended. This is the same miss as the standalone completeness check: the query saw `uploadedfile.py` and judged
+  it covered. The integration is native to the plugin's surface; the query is unchanged and so is its blind spot.
+- Tier 1 in integrate: the plugin's patch carries no tests, so `regression_test` is null with the reason recorded.
+  A real Suggest-patches patch would usually be the same; the kept test would have to come from the verifier's run.
+- Committed copy: `demo_artifacts/claude-security-path-b/` (the report's `.gitignore` removed for the copy only).

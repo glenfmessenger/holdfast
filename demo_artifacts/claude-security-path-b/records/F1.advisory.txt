@@ -1,0 +1,15 @@
+F1: Directory traversal via HTML-entity-encoded upload file name in MultiPartParser
+===================================================================================
+
+MultiPartParser.parse() calls os.path.basename() on the raw Content-Disposition filename and only afterwards HTML-unescapes it via IE_sanitize(html.unescape(...)). Entity-encoded path separators therefore survive basename() and are decoded into real separators after the check, defeating the sanitization ordering.
+
+Impact: An attacker uploading a file with a crafted Content-Disposition filename such as '..&#x2F;target.txt' obtains a name containing '../' after sanitization, so a custom upload handler that uses the name to build a filesystem path can write outside the intended upload directory.
+
+Exploit scenario: POST multipart/form-data with Content-Disposition: form-data; name="file"; filename="..&#x2F;..&#x2F;hax0rd.txt". basename() sees no separator; unescape() then yields '../../hax0rd.txt', which reaches the upload handler's new_file() as the file name.
+
+Recommendation: HTML-unescape the filename first, then strip Windows-style separators, and apply os.path.basename() as the final step, in one sanitize_file_name() helper used at the single call site.
+
+Patch note (Claude Security):
+# F1 — patch note (HAND-BUILT)
+
+This patch is Django's fix d4d800ca1a for CVE-2021-28658 (multipartparser.py part only), placed here so Holdfast can be demonstrated on a report in the plugin's schema. No patch-generator or patch-verifier agent ran. See ../PROVENANCE.md.
