@@ -4,14 +4,30 @@
 
 Holdfast is a merge-time completeness check plus an evidence-tiered remediation record, inside Claude Security: the
 completeness and durability layer on top of Claude Security's remediation. It is for AppSec and engineering teams
-already merging Claude-generated patches. It ships as a fourth item in the `/claude-security` menu, Close finding — see Inside Claude Security below for the
-flow and the demo path taken.
+already merging Claude-generated patches. It ships as a fourth item in the `/claude-security` menu, Close finding.
 
 The finding behind it: fixes are rarely undone and often incomplete. Of 20 fixes studied, 5 were revisited by a later
 CVE in the same function; none silently regressed in the walked, sampled history. The v1 stance is low recall and zero
 false flags, UNVERIFIABLE over guessing, evidence never blended: in the F1 record, the cannot-verify field described
 the consumer the verdict missed. Continuous re-verification of the property across
 refactoring is the six-month direction; the walk below is the experiment that showed why.
+
+**What closing a finding produces**
+
+- **A record, per finding, in its own commit.** One finding, one PR, two commits: the fix as the plugin produced it, and
+  the record beside it. The record holds the property the fix establishes, the evidence by tier, the kept test or the
+  reason it's absent, and what could not be verified.
+- **A base pinned to the scanned revision.** The PR opens against the exact commit the scan ran on, so the evidence is
+  tied to the code it describes — the plugin's revision stamp, extended from "this report" to "this fix".
+- **A completeness check before the PR opens.** Whether the value the fix protects reaches a consumer the fix didn't
+  cover. Anything found goes back into the report as derived findings, to flow through Suggest patches to their own
+  PRs. The PR body lists what was examined.
+- **A PR body that leads with evidence, not the diff.** Property, tiers, and the cannot-verify paragraph before the code.
+- **An object the future can consume.** The kept test runs in the customer's CI. The next scan and the next PR that
+  touch the record's scope check the fix instead of re-deriving it.
+
+Opening the PR is the part you can already do; the rest is new. See Inside Claude Security below for the flow and the
+demo path taken.
 
 ## What the prototype found
 
