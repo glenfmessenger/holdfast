@@ -5,8 +5,8 @@
 A security scanner verifies a fix once, when the fix is written, and that evidence is lost at merge. Holdfast creates a
 durable remediation record for each fix: the security property the fix establishes, the evidence for it labelled by
 tier (executed test, guard structure, rule, model judgement), the scope the property depends on, and what the record
-cannot verify. It keeps the fix's own test running on every later change that touches that scope and reports, per
-change, whether the property held, moved or regressed. At merge, it asks whether the value the fix protects still flows
+cannot verify. It keeps the fix's own test and re-runs it on relevant changes; re-verification of the property itself across
+refactoring is the six-month direction, not a v1 claim. At merge, it asks whether the value the fix protects still flows
 to a consumer the fix did not reach. The design stance: evidence is labelled by tier and never blended, and the tool
 says UNVERIFIABLE rather than guessing.
 
