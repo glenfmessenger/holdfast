@@ -96,17 +96,19 @@ REGRESSED across Django ([eval](results/eval.md), [report](results/report.md)).
 
 ## Try it
 
-**Replay, no key** — `./demo`. First run clones the two targets (~30 s, ~400 MB); replay itself ~8 s; writes only
-`demo_out/`. Replays the three examples from recorded model responses; the banner says so.
-
-**The plugin surface, in Claude Code** — open Claude Code in this repository and run `/holdfast` (or "close finding
-F1"). It finds the included demo report, lists patched findings, and offers integrate and close. Integrate needs
-`ANTHROPIC_API_KEY` and the tier-4 budget: the committed log is at the cap (150 walk + 12 exercise), so raise it with
-`--cap` on the model client / `EXERCISE_CAP` in `holdfast/complete.py`; every call is recorded in
-`results/model_calls.jsonl`. Close also needs `gh` authenticated and opens a PR on your own fork. To use `/holdfast` on
-another repository, copy `.claude/commands/holdfast.md` into that repository's `.claude/commands/`. In the product this
-is the fourth item in `/claude-security`; here it's a separate command because the plugin's menu isn't extensible from
+**The plugin surface, in Claude Code.** Open Claude Code in this repository and run `/holdfast`. It finds the included
+report — a real Claude Security scan of the vulnerable Django commit, produced by the plugin v0.11.0 on 2026-09-04 —
+lists F2 with its patch, and offers integrate and close. Listing and reading the report need nothing. Integrate needs
+`ANTHROPIC_API_KEY` and the tier-4 budget (`--cap`; the committed log is at the cap, and every call is recorded in
+`results/model_calls.jsonl`). Close also needs `gh` authenticated and opens a PR on your own fork. In the product this is
+the fourth item in `/claude-security`; here it's a separate command because the plugin's menu isn't extensible from
 outside.
+
+To run it on your own repository: copy `.claude/commands/holdfast.md` into that repository's `.claude/commands/`, run
+`/claude-security` scan and Suggest patches, then `/holdfast` on the resulting report.
+
+**Replay the evaluation, no key** — `./demo`. First run clones the two targets (~30 s, ~400 MB); replay itself ~8 s;
+writes only `demo_out/`. Replays the three examples from recorded model responses; the banner says so.
 
 To re-run the full evaluation (API key, ~40 minutes), see [REPRODUCING.md](REPRODUCING.md).
 
