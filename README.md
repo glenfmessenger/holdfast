@@ -14,8 +14,8 @@ refactoring is the six-month direction; the walk below is the experiment that sh
 
 **What closing a finding produces**
 
-- **A record, per finding, in its own commit.** One finding, one PR, two commits: the fix as the plugin produced it, and
-  the record beside it. The record holds the property the fix establishes, the evidence by tier, the kept test or the
+- **A record, per finding, in its own commit.** One finding, one PR, two commits — three when the patch carries tests:
+  the fix as the plugin produced it, the kept test, and the record beside it. The record holds the property the fix establishes, the evidence by tier, the kept test or the
   reason it's absent, and what could not be verified.
 - **A base pinned to the scanned revision.** The PR opens against the exact commit the scan ran on, so the evidence is
   tied to the code it describes — the plugin's revision stamp, extended from "this report" to "this fix".
