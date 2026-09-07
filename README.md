@@ -73,7 +73,8 @@ Django's fix `d4d800ca1a` moved HTML-unescaping ahead of path stripping in
 `MultiPartParser`; the contract's extracted test fails on the parent and passes on the fix
 ([contract](contracts/CVE-2021-28658.json)). The completeness check was then handed every file referencing the fix's
 symbols, saw `django/core/files/uploadedfile.py`, and judged its bare `os.path.basename` "a separate, pre-existing
-defense-in-depth layer" because it did not know that pattern was the one the fix had just replaced; it returned COMPLETE
+defense-in-depth layer" because it did not know that pattern was the one the fix had just replaced; it returned COMPLETE (on the Django fix commit; on the plugin's own
+report the same query listed that consumer at low confidence — see PR #3 above)
 ([result](results/completeness/CVE-2021-28658.json), [summary](results/completeness.md)). Django patched `UploadedFile`
 and `FieldFile` four weeks later as CVE-2021-31542. What the tool should have produced is shown as a
 [demo PR on a fork](https://github.com/glenfmessenger/django/pull/1): the fix, the two sibling patches adapted from Django's own later fix, and the remediation record.
